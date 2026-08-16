@@ -14,7 +14,7 @@ const DOH_RESOLVER = "https://cloudflare-dns.com/dns-query";
 const UPSTREAM_BUNDLE_TARGET_BYTES = 128 * 1024;
 const UPSTREAM_QUEUE_MAX_BYTES = 16 * 1024 * 1024;
 const UPSTREAM_QUEUE_MAX_ITEMS = 4096;
-const DOWNSTREAM_GRAIN_BYTES = 32 * 1024;
+const DOWNSTREAM_GRAIN_BYTES = 128 * 1024;
 const DOWNSTREAM_GRAIN_TAIL_THRESHOLD = 512;
 const DOWNSTREAM_GRAIN_SILENT_MS = 1;
 const DNS_CACHE_MAX_ENTRIES = 2048;
@@ -936,7 +936,7 @@ const Router = {
 				else if (msg.includes("timeout") || msg.includes("timed out") || msg.includes("تایم‌اوت")) msg = "تایم‌اوت در اتصال (پـروکـسـی در دسترس نیست)";
 				else if (msg.includes("Invalid URL") || msg.includes("Invalid format")) msg = "فرمت وارد شده برای پـروکـسـی اشتباه است";
 				else if (msg === "err") msg = "خطای نامشخص (ارتباط برقرار نشد)";
-				return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { "Content-Type": "application/json" } });
+				return new Response(JSON.stringify({ error: msg }), { status: 200, headers: { "Content-Type": "application/json" } });
 			}
 		}
 		if (url.pathname.startsWith("/api/users")) {
@@ -1393,7 +1393,9 @@ const SubscriptionService = {
 				resolvedProxies.forEach((proxy) => {
 					const isTlsPort = TLS_PORTS.has(portStr);
 					const tlsVal = isTlsPort ? "tls" : "none";
-					const userFrag = user.frag_len && user.frag_int ? "&fragment=" + user.frag_len + "," + user.frag_int : "";
+					const advancedCs = "TLS_AES_256_GCM_SHA384%3ATLS_CHACHA20_POLY1305_SHA256%3ATLS_AES_128_GCM_SHA256%3ATLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384%3ATLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384%3ATLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256%3ATLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256%3ATLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256%3ATLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256%3ATLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA%3ATLS_ECDHE_RSA_WITH_AES_256_CBC_SHA%3ATLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256%3ATLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256";
+					const advancedFm = "%7B%22tcp%22%3A%5B%7B%22type%22%3A%22fragment%22%2C%22settings%22%3A%7B%22packets%22%3A%22tlshello%22%2C%22lengths%22%3A%5B%225%22%2C%2294%22%2C%221%22%5D%2C%22delays%22%3A%5B%220%22%5D%2C%22maxSplit%22%3A%220%22%7D%7D%2C%7B%22type%22%3A%22fragment%22%2C%22settings%22%3A%7B%22packets%22%3A%221-1%22%2C%22lengths%22%3A%5B%22109%22%2C%221%22%5D%2C%22delays%22%3A%5B%221%22%5D%2C%22maxSplit%22%3A%22355%22%7D%7D%5D%7D";
+					const userFrag = isTlsPort ? "&cs=" + advancedCs + "&fm=" + advancedFm : "&fm=" + advancedFm;
 					const remark = "ZEUS | " + proxy.flagEmoji + " | " + user.username;
 					links.push("vl" + "e" + "ss://" + user.uuid + "@" + ip + ":" + portStr + "?path=" + proxy.currentDynPath + "&security=" + tlsVal + "&encryption=none&insecure=0&host=" + host + "&fp=" + fp + "&type=ws&allowInsecure=0&sni=" + host + userFrag + "#" + encodeURIComponent(remark));
 				});
@@ -2469,9 +2471,9 @@ function createUpstreamQueue({ getWriter, releaseWriter, retryConnect, closeConn
 	};
 }
 function createDownstreamSender(webSocket, headerData = null) {
-	const MAX_CAP = 128 * 1024;
-	const MIN_CAP = 8 * 1024;
-	let currentPacketCap = 32 * 1024;
+	const MAX_CAP = 256 * 1024;
+	const MIN_CAP = 16 * 1024;
+	let currentPacketCap = 128 * 1024;
 	const tailBytes = 512;
 	let header = headerData;
 	let pendingBuffer = null;
@@ -2553,7 +2555,7 @@ function createDownstreamSender(webSocket, headerData = null) {
 async function waitForBackpressure(ws) {
 	if (typeof ws.bufferedAmount === "number") {
 		let maxAttempts = 300;
-		while (ws.bufferedAmount > 512 * 1024 && maxAttempts > 0) {
+		while (ws.bufferedAmount > 1024 * 1024 && maxAttempts > 0) {
 			if (ws.readyState !== WebSocket.OPEN) break;
 			await new Promise((r) => setTimeout(r, 5));
 			maxAttempts--;
@@ -2565,7 +2567,7 @@ async function connectStreams(remoteSocket, webSocket, headerData, retryFunc, on
 		hasData = false,
 		reader,
 		useBYOB = false;
-	const BYOB_LIMIT = 128 * 1024;
+	const BYOB_LIMIT = 256 * 1024;
 	const downstreamSender = createDownstreamSender(webSocket, header);
 	header = null;
 	try {
@@ -2577,7 +2579,7 @@ async function connectStreams(remoteSocket, webSocket, headerData, retryFunc, on
 	try {
 		if (!useBYOB) {
 			while (true) {
-				if (webSocket.bufferedAmount > 512 * 1024) await waitForBackpressure(webSocket);
+				if (webSocket.bufferedAmount > 1024 * 1024) await waitForBackpressure(webSocket);
 				const { done, value } = await reader.read();
 				if (done) break;
 				if (!value || value.byteLength === 0) continue;
@@ -2588,7 +2590,7 @@ async function connectStreams(remoteSocket, webSocket, headerData, retryFunc, on
 		} else {
 			let readBuffer = new ArrayBuffer(BYOB_LIMIT);
 			while (true) {
-				if (webSocket.bufferedAmount > 512 * 1024) await waitForBackpressure(webSocket);
+				if (webSocket.bufferedAmount > 1024 * 1024) await waitForBackpressure(webSocket);
 				const { done, value } = await reader.read(new Uint8Array(readBuffer, 0, BYOB_LIMIT));
 				if (done) break;
 				if (!value || value.byteLength === 0) continue;
@@ -3989,10 +3991,6 @@ const HTML_TEMPLATES = {
 </div>
 <div id="global-message-modal" class="fixed inset-0 z-[86] flex items-center justify-center p-4 bg-black/60  opacity-0 pointer-events-none transition-all duration-300 ease-out">
 	<div class="w-full max-w-md bg-white dark:bg-amoled-card border border-blue-500/50 rounded-md shadow-2xl overflow-hidden p-6 text-center transition-all transform duration-300 opacity-0 scale-95 ease-out">
-		<div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-500 mb-4 shadow-inner">
-			<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-		</div>
-		<h3 class="font-black text-xl text-gray-900 dark:text-white mb-4">پیام همگانی</h3>
 		<div id="global-message-content" class="mb-6 w-full text-center">
 		</div>
 		<button id="global-message-close-btn" class="w-full py-3.5 bg-transparent border-2 border-blue-600 text-blue-700 hover:bg-blue-900/20 hover:text-blue-800 dark:border-blue-500 dark:text-blue-500 dark:hover:bg-blue-900/40 dark:hover:text-blue-400 font-black rounded-md text-sm transition duration-300 shadow-lg">
@@ -4148,13 +4146,14 @@ const HTML_TEMPLATES = {
 										<option value="chrome">🌐 Chrome</option>
 										<option value="firefox">🦊 Firefox</option>
 										<option value="safari">🧭 Safari</option>
-										<option value="ios" selected>📱 iOS (پیشنهادی)</option>
+										<option value="ios">📱 iOS</option>
 										<option value="android">🤖 Android</option>
 										<option value="edge">🌀 Edge</option>
 										<option value="360">🔒 360 Browser</option>
 										<option value="qq">💬 QQ Browser</option>
 										<option value="random">🎲 Random</option>
 										<option value="randomized">🎭 Dynamic</option>
+										<option value="unsafe" selected>🚀 Unsafe</option>
 									</select>
 									<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2 text-gray-500">
 										<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -4968,7 +4967,7 @@ ${COMMON_TOAST_HTML}
 				const cb80 = document.querySelector('input[name="ports"][value="80"]');
 				if (cb80) cb80.checked = true;
 				const fpSelect = document.getElementById('fingerprint-select');
-				if (fpSelect) fpSelect.value = 'ios';
+				if (fpSelect) fpSelect.value = 'unsafe';
 				const bpCheck = document.getElementById('input-block-porn');
 				if (bpCheck) bpCheck.checked = false;
 				const baCheck = document.getElementById('input-block-ads');
@@ -5156,7 +5155,7 @@ ${COMMON_TOAST_HTML}
 					body: JSON.stringify({
 						username: username, limit_gb: null, expiry_days: null, limit_req: null, ip_limit: null,
 						auto_reset_vol_days: 0, auto_reset_req_days: 1, frag_len: "200-3000", frag_int: "1-2",
-						fingerprint: "ios", block_ads: 1, block_porn: 0, port: "443", tls: "on",
+						fingerprint: "unsafe", block_ads: 1, block_porn: 0, port: "443", tls: "on",
 						ips: ipsStr, ip_operator: "all", ip_count: 8, auto_rotate_ip: 1, rotate_time: 1,
 						user_socks5: userSocks5, auto_rotate_user_proxy: 1
 					})
@@ -5190,7 +5189,7 @@ ${COMMON_TOAST_HTML}
 			const cb80 = document.querySelector('input[name="ports"][value="80"]');
 			if (cb80) cb80.checked = true;
 			const fpSelect = document.getElementById('fingerprint-select');
-			if (fpSelect) fpSelect.value = 'ios';
+			if (fpSelect) fpSelect.value = 'unsafe';
 			const fragToggle = document.getElementById('input-frag-toggle');
 			if (fragToggle) fragToggle.checked = true;
 			window.toggleFragInputs(true);
@@ -6265,7 +6264,9 @@ function downloadZeusSource() {
 					resolvedProxies.forEach((proxy) => {
 						const isTlsPort = ["443", "2053", "2083", "2087", "2096", "8443"].includes(portStr);
 						const tlsVal = isTlsPort ? "tls" : "none";
-						const userFrag = user.frag_len && user.frag_int ? "&fragment=" + user.frag_len + "," + user.frag_int : "";
+						const advancedCs = "TLS_AES_256_GCM_SHA384%3ATLS_CHACHA20_POLY1305_SHA256%3ATLS_AES_128_GCM_SHA256%3ATLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384%3ATLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384%3ATLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256%3ATLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256%3ATLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256%3ATLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256%3ATLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA%3ATLS_ECDHE_RSA_WITH_AES_256_CBC_SHA%3ATLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256%3ATLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256";
+						const advancedFm = "%7B%22tcp%22%3A%5B%7B%22type%22%3A%22fragment%22%2C%22settings%22%3A%7B%22packets%22%3A%22tlshello%22%2C%22lengths%22%3A%5B%225%22%2C%2294%22%2C%221%22%5D%2C%22delays%22%3A%5B%220%22%5D%2C%22maxSplit%22%3A%220%22%7D%7D%2C%7B%22type%22%3A%22fragment%22%2C%22settings%22%3A%7B%22packets%22%3A%221-1%22%2C%22lengths%22%3A%5B%22109%22%2C%221%22%5D%2C%22delays%22%3A%5B%221%22%5D%2C%22maxSplit%22%3A%22355%22%7D%7D%5D%7D";
+						const userFrag = isTlsPort ? "&cs=" + advancedCs + "&fm=" + advancedFm : "&fm=" + advancedFm;
 						const remark = "ZEUS | " + proxy.flagEmoji + " | " + user.username;
 						links.push('vle' + 'ss://' + (user.uuid || '') + '@' + ip + ':' + portStr + '?path=' + proxy.currentDynPath + '&security=' + tlsVal + '&encryption=none&insecure=0&host=' + host + '&fp=' + fp + '&type=ws&allowInsecure=0&sni=' + host + userFrag + '#' + encodeURIComponent(remark));
 					});
@@ -6849,7 +6850,7 @@ async function testUserSocksProxy() {
 				window.location.reload();
 			}
 		}
-const CURRENT_VERSION = '1.11.8';
+const CURRENT_VERSION = '1.11.10';
 const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
 		window.autoUpdateStatusCache = false;
 		async function checkAutoUpdateSetup() {
@@ -7927,7 +7928,9 @@ ${COMMON_TOAST_HTML}
 					resolvedProxies.forEach((proxy) => {
 						const isTlsPort = ["443", "2053", "2083", "2087", "2096", "8443"].includes(portStr);
 						const tlsVal = isTlsPort ? "tls" : "none";
-						const userFrag = u.frag_len && u.frag_int ? "&fragment=" + u.frag_len + "," + u.frag_int : "";
+						const advancedCs = "TLS_AES_256_GCM_SHA384%3ATLS_CHACHA20_POLY1305_SHA256%3ATLS_AES_128_GCM_SHA256%3ATLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384%3ATLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384%3ATLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256%3ATLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256%3ATLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256%3ATLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256%3ATLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA%3ATLS_ECDHE_RSA_WITH_AES_256_CBC_SHA%3ATLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256%3ATLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256";
+						const advancedFm = "%7B%22tcp%22%3A%5B%7B%22type%22%3A%22fragment%22%2C%22settings%22%3A%7B%22packets%22%3A%22tlshello%22%2C%22lengths%22%3A%5B%225%22%2C%2294%22%2C%221%22%5D%2C%22delays%22%3A%5B%220%22%5D%2C%22maxSplit%22%3A%220%22%7D%7D%2C%7B%22type%22%3A%22fragment%22%2C%22settings%22%3A%7B%22packets%22%3A%221-1%22%2C%22lengths%22%3A%5B%22109%22%2C%221%22%5D%2C%22delays%22%3A%5B%221%22%5D%2C%22maxSplit%22%3A%22355%22%7D%7D%5D%7D";
+						const userFrag = isTlsPort ? "&cs=" + advancedCs + "&fm=" + advancedFm : "&fm=" + advancedFm;
 						const remark = "ZEUS | " + proxy.flagEmoji + " | " + u.username;
 						links.push('vle' + 'ss://' + (u.uuid || '') + '@' + ip + ':' + portStr + '?path=' + proxy.currentDynPath + '&security=' + tlsVal + '&encryption=none&insecure=0&host=' + host + '&fp=' + fp + '&type=ws&allowInsecure=0&sni=' + host + userFrag + '#' + encodeURIComponent(remark));
 					});
