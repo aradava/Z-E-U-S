@@ -42,6 +42,10 @@
 
 </div>
 
+> [!CAUTION]
+> **Security Notice**
+> If you believe this project does not comply with GitHub's Community Guidelines or Acceptable Use Policies, please let us know. We make every effort to ensure all our projects are secure and compliant with GitHub's policies.
+
 ---
 
 # ⚡️ Features
@@ -182,13 +186,6 @@ powershell -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::Security
    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=panel-zeus/Z-E-U-S&type=date&legend=bottom-right&sealed_token=r3Lb_3aKfu0utexFy3xJoisRGRSGS4OCoQg3ZS5TM1QCTppem2RU8sLiVsD6UQ38Ah92MwuZU_PjyQTFM5yY3rAw14WEjtonC70muFBH4RbXxBDGIy5iIw" />
  </picture>
 </a>
-
----
-
-
-> [!CAUTION]
-> **Security Notice**
-> If you believe this project does not comply with GitHub's Community Guidelines or Acceptable Use Policies, please let us know. We make every effort to ensure all our projects are secure and compliant with GitHub's policies.
 
 ---
 
