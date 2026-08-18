@@ -964,7 +964,7 @@ const Router = {
 						}
 						return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" } });
 					} else {
-						const { username: new_username, limit_gb, expiry_days, limit_req, ips, tls, port, fingerprint, ip_limit, block_porn, block_ads, frag_len, frag_int, user_proxy_iata, user_socks5, user_proxy_ip, auto_reset_vol_days, auto_reset_req_days, auto_rotate_ip, rotate_time, ip_operator, ip_count, auto_rotate_user_proxy } = body;
+						const { username: new_username, limit_gb, expiry_days, limit_req, ips, tls, port, fingerprint, ip_limit, block_porn, block_ads, frag_len, frag_int, advanced_frag, cipher_suites, tls_mask, user_proxy_iata, user_socks5, user_proxy_ip, auto_reset_vol_days, auto_reset_req_days, auto_rotate_ip, rotate_time, ip_operator, ip_count, auto_rotate_user_proxy } = body;
 						if (new_username && new_username !== username) {
 							if (!/^[a-zA-Z0-9_-]+$/.test(new_username)) {
 								return new Response(JSON.stringify({ error: "نام کاربری جدید غیرمجاز است" }), { status: 400, headers: { "Content-Type": "application/json; charset=utf-8" } });
@@ -990,8 +990,8 @@ const Router = {
 								GLOBAL_LAST_ACTIVE_WRITE.delete(username);
 							}
 						}
-						await env.DB.prepare("UPDATE users SET username = ?, limit_gb = ?, expiry_days = ?, limit_req = ?, ips = ?, tls = ?, port = ?, fingerprint = ?, max_connections = ?, ip_limit = ?, block_porn = ?, block_ads = ?, frag_len = ?, frag_int = ?, user_proxy_iata = ?, user_socks5 = ?, user_proxy_ip = ?, auto_reset_vol_days = ?, auto_reset_req_days = ?, auto_rotate_ip = ?, rotate_time = ?, ip_operator = ?, ip_count = ?, auto_rotate_user_proxy = ? WHERE username = ?")
-							.bind(new_username || username, limit_gb ? parseFloat(limit_gb) : null, expiry_days ? parseInt(expiry_days) : null, limit_req ? parseInt(limit_req) : null, ips || null, tls, port, fingerprint || "chrome", ip_limit ? parseInt(ip_limit) : null, ip_limit ? parseInt(ip_limit) : null, block_porn ? 1 : 0, block_ads ? 1 : 0, frag_len !== undefined ? frag_len : "200-3000", frag_int !== undefined ? frag_int : "1-2", user_proxy_iata || null, user_socks5 || null, user_proxy_ip || null, auto_reset_vol_days ? parseInt(auto_reset_vol_days) : 0, auto_reset_req_days ? parseInt(auto_reset_req_days) : 0, auto_rotate_ip || 0, rotate_time || 0, ip_operator || "all", ip_count || 20, auto_rotate_user_proxy ? 1 : 0, username)
+						await env.DB.prepare("UPDATE users SET username = ?, limit_gb = ?, expiry_days = ?, limit_req = ?, ips = ?, tls = ?, port = ?, fingerprint = ?, max_connections = ?, ip_limit = ?, block_porn = ?, block_ads = ?, frag_len = ?, frag_int = ?, advanced_frag = ?, cipher_suites = ?, tls_mask = ?, user_proxy_iata = ?, user_socks5 = ?, user_proxy_ip = ?, auto_reset_vol_days = ?, auto_reset_req_days = ?, auto_rotate_ip = ?, rotate_time = ?, ip_operator = ?, ip_count = ?, auto_rotate_user_proxy = ? WHERE username = ?")
+							.bind(new_username || username, limit_gb ? parseFloat(limit_gb) : null, expiry_days ? parseInt(expiry_days) : null, limit_req ? parseInt(limit_req) : null, ips || null, tls, port, fingerprint || "chrome", ip_limit ? parseInt(ip_limit) : null, ip_limit ? parseInt(ip_limit) : null, block_porn ? 1 : 0, block_ads ? 1 : 0, frag_len !== undefined ? frag_len : "200-3000", frag_int !== undefined ? frag_int : "1-2", advanced_frag || null, cipher_suites || null, tls_mask || null, user_proxy_iata || null, user_socks5 || null, user_proxy_ip || null, auto_reset_vol_days ? parseInt(auto_reset_vol_days) : 0, auto_reset_req_days ? parseInt(auto_reset_req_days) : 0, auto_rotate_ip || 0, rotate_time || 0, ip_operator || "all", ip_count || 20, auto_rotate_user_proxy ? 1 : 0, username)
 							.run();
 						return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" } });
 					}
@@ -1071,7 +1071,7 @@ const Router = {
 					}
 				}
 				if (request.method === "POST") {
-					const { username, uuid, limit_gb, expiry_days, limit_req, ips, tls, port, fingerprint, ip_limit, used_gb, used_req, created_at, is_active, block_porn, block_ads, frag_len, frag_int, user_proxy_iata, user_socks5, user_proxy_ip, auto_reset_vol_days, auto_reset_req_days, auto_rotate_ip, rotate_time, ip_operator, ip_count, auto_rotate_user_proxy } = await readJsonBody(request);
+					const { username, uuid, limit_gb, expiry_days, limit_req, ips, tls, port, fingerprint, ip_limit, used_gb, used_req, created_at, is_active, block_porn, block_ads, frag_len, frag_int, advanced_frag, cipher_suites, tls_mask, user_proxy_iata, user_socks5, user_proxy_ip, auto_reset_vol_days, auto_reset_req_days, auto_rotate_ip, rotate_time, ip_operator, ip_count, auto_rotate_user_proxy } = await readJsonBody(request);
 					if (!username) {
 						return new Response(JSON.stringify({ error: "نام کاربری اجباری است" }), { status: 400, headers: { "Content-Type": "application/json" } });
 					}
@@ -1102,8 +1102,8 @@ const Router = {
 					try {
 						const todayUtc = Math.floor(Date.now() / 86400000) * 86400000;
 						const nowTime = Date.now();
-						await env.DB.prepare("INSERT INTO users (username, uuid, limit_gb, expiry_days, limit_req, ips, connection_type, tls, port, fingerprint, max_connections, ip_limit, used_gb, used_req, created_at, is_active, block_porn, block_ads, frag_len, frag_int, user_proxy_iata, user_socks5, user_proxy_ip, auto_reset_vol_days, auto_reset_req_days, last_reset_vol_time, last_reset_req_time, auto_rotate_ip, rotate_time, ip_operator, ip_count, last_rotate_time, auto_rotate_user_proxy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-							.bind(username, finalUuid, limit_gb ? parseFloat(limit_gb) : null, expiry_days ? parseInt(expiry_days) : null, limit_req ? parseInt(limit_req) : null, ips || null, "vl" + "e" + "ss", tls, port, fingerprint || "chrome", ip_limit ? parseInt(ip_limit) : null, ip_limit ? parseInt(ip_limit) : null, finalUsedGb, finalUsedReq, finalCreatedAt, finalIsActive, block_porn ? 1 : 0, block_ads ? 1 : 0, frag_len !== undefined ? frag_len : "200-3000", frag_int !== undefined ? frag_int : "1-2", user_proxy_iata || null, user_socks5 || null, user_proxy_ip || null, auto_reset_vol_days ? parseInt(auto_reset_vol_days) : 0, auto_reset_req_days ? parseInt(auto_reset_req_days) : 0, todayUtc, todayUtc, auto_rotate_ip || 0, rotate_time || 0, ip_operator || "all", ip_count || 20, nowTime, auto_rotate_user_proxy ? 1 : 0)
+						await env.DB.prepare("INSERT INTO users (username, uuid, limit_gb, expiry_days, limit_req, ips, connection_type, tls, port, fingerprint, max_connections, ip_limit, used_gb, used_req, created_at, is_active, block_porn, block_ads, frag_len, frag_int, advanced_frag, cipher_suites, tls_mask, user_proxy_iata, user_socks5, user_proxy_ip, auto_reset_vol_days, auto_reset_req_days, last_reset_vol_time, last_reset_req_time, auto_rotate_ip, rotate_time, ip_operator, ip_count, last_rotate_time, auto_rotate_user_proxy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+							.bind(username, finalUuid, limit_gb ? parseFloat(limit_gb) : null, expiry_days ? parseInt(expiry_days) : null, limit_req ? parseInt(limit_req) : null, ips || null, "vl" + "e" + "ss", tls, port, fingerprint || "chrome", ip_limit ? parseInt(ip_limit) : null, ip_limit ? parseInt(ip_limit) : null, finalUsedGb, finalUsedReq, finalCreatedAt, finalIsActive, block_porn ? 1 : 0, block_ads ? 1 : 0, frag_len !== undefined ? frag_len : "200-3000", frag_int !== undefined ? frag_int : "1-2", advanced_frag || null, cipher_suites || null, tls_mask || null, user_proxy_iata || null, user_socks5 || null, user_proxy_ip || null, auto_reset_vol_days ? parseInt(auto_reset_vol_days) : 0, auto_reset_req_days ? parseInt(auto_reset_req_days) : 0, todayUtc, todayUtc, auto_rotate_ip || 0, rotate_time || 0, ip_operator || "all", ip_count || 20, nowTime, auto_rotate_user_proxy ? 1 : 0)
 							.run();
 						return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" } });
 					} catch (err) {
@@ -1161,6 +1161,9 @@ const DbService = {
 				const { results } = await db.prepare("PRAGMA table_info(users)").all();
 				const existingCols = new Set((results || []).map((r) => r.name));
 				const colsToAdd = [
+					{ name: "advanced_frag", def: "TEXT DEFAULT NULL" },
+					{ name: "cipher_suites", def: "TEXT DEFAULT NULL" },
+					{ name: "tls_mask", def: "TEXT DEFAULT NULL" },
 					{ name: "is_active", def: "INTEGER DEFAULT 1" },
 					{ name: "last_active", def: "INTEGER" },
 					{ name: "fingerprint", def: "TEXT DEFAULT 'chrome'" },
@@ -1393,9 +1396,11 @@ const SubscriptionService = {
 				resolvedProxies.forEach((proxy) => {
 					const isTlsPort = TLS_PORTS.has(portStr);
 					const tlsVal = isTlsPort ? "tls" : "none";
-					const advancedCs = "TLS_AES_256_GCM_SHA384%3ATLS_CHACHA20_POLY1305_SHA256%3ATLS_AES_128_GCM_SHA256%3ATLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384%3ATLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384%3ATLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256%3ATLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256%3ATLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256%3ATLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256%3ATLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA%3ATLS_ECDHE_RSA_WITH_AES_256_CBC_SHA%3ATLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256%3ATLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256";
-					const advancedFm = "%7B%22tcp%22%3A%5B%7B%22type%22%3A%22fragment%22%2C%22settings%22%3A%7B%22packets%22%3A%22tlshello%22%2C%22lengths%22%3A%5B%225%22%2C%2294%22%2C%221%22%5D%2C%22delays%22%3A%5B%220%22%5D%2C%22maxSplit%22%3A%220%22%7D%7D%2C%7B%22type%22%3A%22fragment%22%2C%22settings%22%3A%7B%22packets%22%3A%221-1%22%2C%22lengths%22%3A%5B%22109%22%2C%221%22%5D%2C%22delays%22%3A%5B%221%22%5D%2C%22maxSplit%22%3A%22355%22%7D%7D%5D%7D";
-					const userFrag = isTlsPort ? "&cs=" + advancedCs + "&fm=" + advancedFm : "&fm=" + advancedFm;
+					let userFrag = "";
+					if (user.advanced_frag) userFrag += "&fm=" + encodeURIComponent(user.advanced_frag);
+					if (isTlsPort && user.cipher_suites) userFrag += "&cs=" + encodeURIComponent(user.cipher_suites);
+					if (user.tls_mask) userFrag += "&mask=" + encodeURIComponent(user.tls_mask);
+					
 					const remark = "ZEUS | " + proxy.flagEmoji + " | " + user.username;
 					links.push("vl" + "e" + "ss://" + user.uuid + "@" + ip + ":" + portStr + "?path=" + proxy.currentDynPath + "&security=" + tlsVal + "&encryption=none&insecure=0&host=" + host + "&fp=" + fp + "&type=ws&allowInsecure=0&sni=" + host + userFrag + "#" + encodeURIComponent(remark));
 				});
@@ -2735,22 +2740,38 @@ async function connectProxy(proxyStr, destAddr, destPort, initialData) {
 			normalized = user && pass ? `socks5://${user}:${pass}@${server}:${port}` : `socks5://${server}:${port}`;
 		}
 	}
+	
+	const hasProtocol = /^(socks4|socks5|socks|http|https):\/\//i.test(normalized);
 	const isHttp = normalized.toLowerCase().startsWith("http://") || normalized.toLowerCase().startsWith("https://");
 	const isSocks4 = normalized.toLowerCase().startsWith("socks4://");
 	let cleanStr = normalized.replace(/^(socks4|socks5|socks|http|https):\/\//i, "");
+	
 	if (isHttp) {
 		return await connectHttp(cleanStr, destAddr, destPort, initialData);
 	}
 	if (isSocks4) {
 		return await connectSocks4(cleanStr, destAddr, destPort, initialData);
 	}
-	return await connectSocks5(cleanStr, destAddr, destPort, initialData);
+	if (hasProtocol) {
+		return await connectSocks5(cleanStr, destAddr, destPort, initialData);
+	}
+	
+	return await Promise.any([
+		connectSocks5(cleanStr, destAddr, destPort, initialData),
+		connectHttp(cleanStr, destAddr, destPort, initialData)
+	]);
 }
 async function connectSocks4(proxyStr, destAddr, destPort, initialData) {
 	const { user, pass, host, port, auth } = parseProxyConfig(proxyStr, 1080);
 	const socket = connect({ hostname: host, port: port });
 	const reader = socket.readable.getReader();
 	const writer = socket.writable.getWriter();
+	
+	const readWithTimeout = (r, ms) => Promise.race([
+		r.read(),
+		new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))
+	]);
+
 	try {
 		const portHigh = (destPort >> 8) & 0xff;
 		const portLow = destPort & 0xff;
@@ -2774,7 +2795,7 @@ async function connectSocks4(proxyStr, destAddr, destPort, initialData) {
 			req[9 + hostBytes.length] = 0x00;
 		}
 		await writer.write(req);
-		let res = await reader.read();
+		let res = await readWithTimeout(reader, 2000);
 		if (res.done || !res.value || res.value[0] !== 0x00 || res.value[1] !== 0x5a) {
 			throw new Error("پـروکـسـی SOCKS4 وصل نشد یا اتصال را رد کرد");
 		}
@@ -2785,15 +2806,9 @@ async function connectSocks4(proxyStr, destAddr, destPort, initialData) {
 		reader.releaseLock();
 		return socket;
 	} catch (e) {
-		try {
-			writer.releaseLock();
-		} catch (err) {}
-		try {
-			reader.releaseLock();
-		} catch (err) {}
-		try {
-			socket.close();
-		} catch (err) {}
+		try { writer.releaseLock(); } catch (err) {}
+		try { reader.releaseLock(); } catch (err) {}
+		try { socket.close(); } catch (err) {}
 		throw e;
 	}
 }
@@ -2839,13 +2854,19 @@ async function connectSocks5(socksStr, destAddr, destPort, initialData) {
 	const socket = connect({ hostname: host, port: port });
 	const reader = socket.readable.getReader();
 	const writer = socket.writable.getWriter();
+	
+	const readWithTimeout = (r, ms) => Promise.race([
+		r.read(),
+		new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))
+	]);
+
 	try {
 		if (auth) {
 			await writer.write(new Uint8Array([0x05, 0x02, 0x00, 0x02]));
 		} else {
 			await writer.write(new Uint8Array([0x05, 0x01, 0x00]));
 		}
-		let res = await reader.read();
+		let res = await readWithTimeout(reader, 2000);
 		if (res.done || !res.value || res.value[0] !== 0x05) throw new Error("پاسخ نامعتبر از سرور (پـروکـسـی SOCKS5 نیست یا خاموش است)");
 		const method = res.value[1];
 		if (method === 0x02) {
@@ -2858,7 +2879,7 @@ async function connectSocks5(socksStr, destAddr, destPort, initialData) {
 			authReq[2 + uEnc.length] = pEnc.length;
 			authReq.set(pEnc, 3 + uEnc.length);
 			await writer.write(authReq);
-			let authRes = await reader.read();
+			let authRes = await readWithTimeout(reader, 2000);
 			if (authRes.done || !authRes.value || authRes.value[1] !== 0x00) throw new Error("نام کاربری یا رمز عبور پـروکـسـی اشتباه است");
 		}
 		let addrType = 0x03;
@@ -2891,7 +2912,7 @@ async function connectSocks5(socksStr, destAddr, destPort, initialData) {
 		req[portOffset] = (destPort >> 8) & 0xff;
 		req[portOffset + 1] = destPort & 0xff;
 		await writer.write(req);
-		let connRes = await reader.read();
+		let connRes = await readWithTimeout(reader, 2000);
 		if (connRes.done || !connRes.value || connRes.value[1] !== 0x00) throw new Error("پـروکـسـی وصل شد اما دسترسی به اینترنت آزاد ندارد");
 		if (initialData && initialData.byteLength > 0) {
 			await writer.write(convertToUint8Array(initialData));
@@ -2900,15 +2921,9 @@ async function connectSocks5(socksStr, destAddr, destPort, initialData) {
 		reader.releaseLock();
 		return socket;
 	} catch (e) {
-		try {
-			writer.releaseLock();
-		} catch (err) {}
-		try {
-			reader.releaseLock();
-		} catch (err) {}
-		try {
-			socket.close();
-		} catch (err) {}
+		try { writer.releaseLock(); } catch (err) {}
+		try { reader.releaseLock(); } catch (err) {}
+		try { socket.close(); } catch (err) {}
 		throw e;
 	}
 }
@@ -2917,6 +2932,12 @@ async function connectHttp(proxyStr, destAddr, destPort, initialData) {
 	const socket = connect({ hostname: host, port: port });
 	const reader = socket.readable.getReader();
 	const writer = socket.writable.getWriter();
+	
+	const readWithTimeout = (r, ms) => Promise.race([
+		r.read(),
+		new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))
+	]);
+
 	try {
 		const safeDest = destAddr.includes(":") ? `[${destAddr}]` : destAddr;
 		let req = `CONNECT ${safeDest}:${destPort} HTTP/1.1\r\nHost: ${safeDest}:${destPort}\r\n`;
@@ -2929,7 +2950,7 @@ async function connectHttp(proxyStr, destAddr, destPort, initialData) {
 		let resStr = "";
 		const dec = new TextDecoder();
 		while (true) {
-			const res = await reader.read();
+			const res = await readWithTimeout(reader, 2000);
 			if (res.done || !res.value) throw new Error("proxy_closed");
 			resStr += dec.decode(res.value, { stream: true });
 			if (resStr.includes("\r\n\r\n")) {
@@ -2948,15 +2969,9 @@ async function connectHttp(proxyStr, destAddr, destPort, initialData) {
 		reader.releaseLock();
 		return socket;
 	} catch (e) {
-		try {
-			writer.releaseLock();
-		} catch (err) {}
-		try {
-			reader.releaseLock();
-		} catch (err) {}
-		try {
-			socket.close();
-		} catch (err) {}
+		try { writer.releaseLock(); } catch (err) {}
+		try { reader.releaseLock(); } catch (err) {}
+		try { socket.close(); } catch (err) {}
 		throw e;
 	}
 }
@@ -4011,6 +4026,26 @@ const HTML_TEMPLATES = {
 		</button>
 	</div>
 </div>
+<div id="pattng-info-modal" class="fixed inset-0 z-[115] flex items-center justify-center p-4 bg-black/60 opacity-0 pointer-events-none transition-all duration-300 ease-out">
+	<div class="w-full max-w-md bg-white dark:bg-amoled-card border border-[#33FB1F]/50 rounded-md shadow-2xl overflow-hidden p-6 text-center transition-all transform duration-300 opacity-0 scale-95 ease-out">
+		<div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#33FB1F]/10 text-[#33FB1F] mb-4 shadow-[0_0_15px_rgba(51,251,31,0.2)]">
+			<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+		</div>
+		<h3 class="font-black text-xl text-gray-900 dark:text-white mb-2">توجه: پیش‌نیاز بهینه‌سازی</h3>
+		<p class="text-sm text-gray-600 dark:text-gray-400 mb-6 leading-relaxed font-medium">
+			قابلیت‌های <b>Patterniha</b> در حال حاضر <span class="text-[#33FB1F] font-bold">فقط روی اندروید</span> و منحصراً روی اپلیکیشن <span class="text-[#33FB1F] font-bold">PattNG</span> پشتیبانی می‌شود. لطفاً برای استفاده از این قابلیت، نرم‌افزار مربوطه را نصب کنید.
+		</p>
+		<div class="flex flex-col gap-3">
+			<a href="https://github.com/patterniha/PattNG/releases" target="_blank" class="w-full py-3.5 bg-[#33FB1F]/10 hover:bg-[#33FB1F]/20 text-[#33FB1F] border border-[#33FB1F]/50 font-black rounded-md text-sm transition duration-300 shadow-[0_0_10px_rgba(51,251,31,0.2)] flex items-center justify-center gap-2">
+				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+				دانلود PattNG از گیت‌هاب
+			</a>
+			<button onclick="togglePattNgModal(false)" class="w-full py-3.5 bg-transparent border-2 border-gray-500 text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-zinc-800 font-bold rounded-md text-sm transition duration-300">
+				متوجه شدم، بستن
+			</button>
+		</div>
+	</div>
+</div>
 <div id="config-count-warning-modal" class="fixed inset-0 z-[88] flex items-center justify-center p-4 bg-black/60  opacity-0 pointer-events-none transition-all duration-300 ease-out">
 	<div class="w-full max-w-md bg-white dark:bg-amoled-card border border-amber-500/50 rounded-md shadow-2xl overflow-hidden p-6 text-center transition-all transform duration-300 opacity-0 scale-95 ease-out">
 		<div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-500 mb-4 shadow-inner">
@@ -4126,20 +4161,7 @@ const HTML_TEMPLATES = {
 							</div>
 						</div>
 						<div class="grid grid-cols-2 gap-3">
-							<div class="p-3 bg-gray-50 dark:bg-amoled-input border border-gray-200/60 dark:border-amoled-border rounded-md shadow-sm">
-								<div class="flex items-center justify-between mb-2">
-									<span class="text-[10px] font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider">Fragment</span>
-									<label class="relative inline-flex items-center cursor-pointer select-none">
-										<input type="checkbox" id="input-frag-toggle" onchange="toggleFragInputs(this.checked)" class="sr-only peer" checked>
-										<div class="w-9 h-5 bg-gray-200 rounded-full peer dark:bg-zinc-700 peer-checked:bg-green-600 transition-colors after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-transform peer-checked:after:-translate-x-[18px]"></div>
-									</label>
-								</div>
-								<div id="frag-inputs-container" class="grid grid-cols-2 gap-1.5 transition-all duration-300">
-									<input type="text" id="input-frag-len" placeholder="Len" value="200-3000" dir="ltr" class="w-full px-1.5 py-1 bg-white dark:bg-amoled-input border border-gray-200 dark:border-amoled-border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-[10px] font-mono text-center text-gray-800 dark:text-zinc-100">
-									<input type="text" id="input-frag-int" placeholder="Int" value="1-2" dir="ltr" class="w-full px-1.5 py-1 bg-white dark:bg-amoled-input border border-gray-200 dark:border-amoled-border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-[10px] font-mono text-center text-gray-800 dark:text-zinc-100">
-								</div>
-							</div>
-							<div class="p-3 bg-gray-50 dark:bg-amoled-input border border-gray-200/60 dark:border-amoled-border rounded-md shadow-sm">
+							<div class="p-3 bg-gray-50 dark:bg-amoled-input border border-gray-200/60 dark:border-amoled-border rounded-md shadow-sm h-full flex flex-col justify-center">
 								<label class="block text-[10px] font-bold text-gray-500 dark:text-zinc-400 mb-1.5 uppercase tracking-wider">Fingerprint</label>
 								<div class="relative">
 									<select id="fingerprint-select" class="w-full px-2 py-1.5 bg-white dark:bg-amoled-input border border-gray-200 dark:border-amoled-border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-[10px] font-semibold text-gray-700 dark:text-zinc-300 cursor-pointer appearance-none">
@@ -4153,28 +4175,58 @@ const HTML_TEMPLATES = {
 										<option value="qq">💬 QQ Browser</option>
 										<option value="random">🎲 Random</option>
 										<option value="randomized">🎭 Dynamic</option>
-										<option value="unsafe" selected>🚀 Unsafe</option>
+										<option value="unsafe" selected>🚀 Unsafe (پیشنهادی)</option>
 									</select>
 									<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2 text-gray-500">
 										<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
 									</div>
 								</div>
 							</div>
-						</div>
-						<div class="grid grid-cols-2 gap-2">
-							<div class="flex items-center justify-between bg-gray-50 dark:bg-amoled-input border border-gray-200 dark:border-amoled-border rounded-md p-1.5 shadow-sm">
-								<span class="text-[10px] sm:text-xs font-semibold text-gray-700 dark:text-zinc-300 whitespace-nowrap pl-1">NSFW BLOCKER</span>
-								<label class="relative inline-flex items-center cursor-pointer scale-[0.65] sm:scale-75 origin-left">
-									<input type="checkbox" id="input-block-porn" class="sr-only peer">
-									<div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-700"></div>
-								</label>
+							<div class="flex flex-col gap-2">
+								<div class="flex items-center justify-between bg-gray-50 dark:bg-amoled-input border border-gray-200 dark:border-amoled-border rounded-md p-1.5 shadow-sm flex-1">
+									<span class="text-[10px] sm:text-xs font-semibold text-gray-700 dark:text-zinc-300 whitespace-nowrap pl-1">NSFW BLOCKER</span>
+									<label class="relative inline-flex items-center cursor-pointer scale-[0.65] sm:scale-75 origin-left">
+										<input type="checkbox" id="input-block-porn" class="sr-only peer">
+										<div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-700"></div>
+									</label>
+								</div>
+								<div class="flex items-center justify-between bg-gray-50 dark:bg-amoled-input border border-gray-200 dark:border-amoled-border rounded-md p-1.5 shadow-sm flex-1">
+									<span class="text-[10px] sm:text-xs font-semibold text-gray-700 dark:text-zinc-300 whitespace-nowrap pl-1">ADS BLOCKER</span>
+									<label class="relative inline-flex items-center cursor-pointer scale-[0.65] sm:scale-75 origin-left">
+										<input type="checkbox" id="input-block-ads" class="sr-only peer">
+										<div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-700"></div>
+									</label>
+								</div>
 							</div>
-							<div class="flex items-center justify-between bg-gray-50 dark:bg-amoled-input border border-gray-200 dark:border-amoled-border rounded-md p-1.5 shadow-sm">
-								<span class="text-[10px] sm:text-xs font-semibold text-gray-700 dark:text-zinc-300 whitespace-nowrap pl-1">ADS BLOCKER</span>
-								<label class="relative inline-flex items-center cursor-pointer scale-[0.65] sm:scale-75 origin-left">
-									<input type="checkbox" id="input-block-ads" class="sr-only peer">
-									<div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-700"></div>
-								</label>
+						</div>
+						<div class="mt-3 border border-gray-200 dark:border-amoled-border rounded-md bg-gray-50 dark:bg-amoled-input overflow-hidden">
+							<div class="w-full flex items-center justify-between p-2.5 text-xs font-bold text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800/50 transition cursor-pointer" onclick="document.getElementById('advanced-settings-container').classList.toggle('hidden'); document.getElementById('advanced-settings-icon').classList.toggle('rotate-180');">
+								<div class="flex items-center gap-1.5">
+									<svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+									<span>تنظیمات پیشرفته بهینه سازی</span>
+									<span onclick="event.stopPropagation(); togglePattNgModal(true)" class="mr-2 px-1.5 py-0.5 bg-[#33FB1F]/10 text-[#33FB1F] border border-[#33FB1F]/30 rounded text-[10px] hover:bg-[#33FB1F]/20 transition-colors shadow-[0_0_8px_rgba(51,251,31,0.3)] animate-pulse cursor-pointer">نکته مهم 🚨</span>
+								</div>
+								<div class="flex items-center gap-3">
+									<label class="relative inline-flex items-center cursor-pointer select-none" onclick="event.stopPropagation();">
+										<input type="checkbox" id="input-advanced-settings-toggle" onchange="toggleAdvancedSettingsInputs(this.checked)" class="sr-only peer">
+										<div class="w-8 h-4 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:bg-purple-500 transition-colors after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-transform peer-checked:after:-translate-x-[16px]"></div>
+									</label>
+									<svg id="advanced-settings-icon" class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+								</div>
+							</div>
+							<div id="advanced-settings-container" class="hidden opacity-50 pointer-events-none transition-opacity duration-300 p-3 border-t border-gray-200 dark:border-amoled-border space-y-3 bg-white dark:bg-amoled-card">
+								<div>
+									<label class="block text-[10px] font-bold text-gray-500 dark:text-zinc-400 mb-1 tracking-wider">Advanced Fragment (fm)</label>
+									<input type="text" id="input-advanced-frag" placeholder="{&quot;tcp&quot;: [{&quot;type&quot;: &quot;fragment&quot;..." dir="ltr" class="w-full px-2 py-1.5 bg-gray-50 dark:bg-amoled-input border border-gray-200 dark:border-amoled-border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-[10px] font-mono text-gray-800 dark:text-zinc-100 placeholder-gray-400">
+								</div>
+								<div>
+									<label class="block text-[10px] font-bold text-gray-500 dark:text-zinc-400 mb-1 tracking-wider">Cipher Suites (cs)</label>
+									<input type="text" id="input-cipher-suites" placeholder="TLS_AES_256_GCM_SHA384..." dir="ltr" class="w-full px-2 py-1.5 bg-gray-50 dark:bg-amoled-input border border-gray-200 dark:border-amoled-border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-[10px] font-mono text-gray-800 dark:text-zinc-100 placeholder-gray-400">
+								</div>
+								<button type="button" onclick="fillPatternihaValues()" class="w-full py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-md text-[11px] font-bold transition shadow-sm flex items-center justify-center gap-1.5 mt-2">
+									<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+									پر کردن خودکار مقادیر Patterniha
+								</button>
 							</div>
 						</div>
 					</div>
@@ -4936,6 +4988,18 @@ ${COMMON_TOAST_HTML}
 				}
 			}
 		};
+		window.toggleAdvancedSettingsInputs = function(show) {
+			const container = document.getElementById('advanced-settings-container');
+			const icon = document.getElementById('advanced-settings-icon');
+			if (container) {
+				if (show) {
+					container.classList.remove('opacity-50', 'pointer-events-none', 'hidden');
+					if (icon) icon.classList.add('rotate-180');
+				} else {
+					container.classList.add('opacity-50', 'pointer-events-none');
+				}
+			}
+		};
 		window.toggleAutoRotateIpInputs = function(show) {
 			const container = document.getElementById('auto-rotate-ip-inputs-container');
 			if (container) {
@@ -4983,6 +5047,15 @@ ${COMMON_TOAST_HTML}
 				window.toggleFragInputs(true);
 				const customPortInput = document.getElementById('input-custom-ports');
 				if (customPortInput) customPortInput.value = '';
+				const advFragInput = document.getElementById('input-advanced-frag');
+				if (advFragInput) advFragInput.value = '';
+				const csInput = document.getElementById('input-cipher-suites');
+				if (csInput) csInput.value = '';
+				const maskInput = document.getElementById('input-tls-mask');
+				if (maskInput) maskInput.value = '';
+				const advSettingsToggle = document.getElementById('input-advanced-settings-toggle');
+				if (advSettingsToggle) advSettingsToggle.checked = false;
+				if (typeof window.toggleAdvancedSettingsInputs === 'function') window.toggleAdvancedSettingsInputs(false);
 				document.getElementById('hidden-auto-rotate').value = '0';
 				document.getElementById('hidden-rotate-time').value = '';
 				document.getElementById('hidden-ip-operator').value = 'all';
@@ -5035,7 +5108,7 @@ ${COMMON_TOAST_HTML}
 					[vipCountries[i], vipCountries[j]] = [vipCountries[j], vipCountries[i]];
 				}
 
-				const selectedCountries = vipCountries.slice(0, 5);
+				const selectedCountries = vipCountries.slice(0, 8);
 				let candidateProxies = [];
 				
 				await Promise.all(selectedCountries.map(async (country) => {
@@ -5085,7 +5158,7 @@ ${COMMON_TOAST_HTML}
 							if (data.success && !foundCountries.has(item.country)) {
 								foundCountries.add(item.country);
 								successProxies.push({ proxy: item.proxy, ping: data.ping });
-								if (successProxies.length >= 5) {
+								if (successProxies.length >= 3) {
 									isDone = true;
 									resolveRace();
 								}
@@ -5101,7 +5174,7 @@ ${COMMON_TOAST_HTML}
 					});
 				});
 
-				const timeoutPromise = new Promise(resolve => setTimeout(resolve, 6000));
+				const timeoutPromise = new Promise(resolve => setTimeout(resolve, 8000));
 				await Promise.race([racePromise, timeoutPromise]);
 				controller.abort(); 
 
@@ -5116,7 +5189,7 @@ ${COMMON_TOAST_HTML}
 				}
 
 				successProxies.sort((a, b) => a.ping - b.ping);
-				const fastestProxies = successProxies.slice(0, 5).map(p => p.proxy);
+				const fastestProxies = successProxies.slice(0, 3).map(p => p.proxy);
 				const userSocks5 = JSON.stringify(fastestProxies);
 				
 				let availableIps = [];
@@ -5815,9 +5888,12 @@ ${COMMON_TOAST_HTML}
 			const checkedPorts = Array.from(document.querySelectorAll('input[name="ports"]:checked')).map(cb => cb.value).concat(customPortsArray);
 			const block_porn = document.getElementById('input-block-porn').checked ? 1 : 0;
 			const block_ads = document.getElementById('input-block-ads').checked ? 1 : 0;
-			const isFragEnabled = document.getElementById('input-frag-toggle').checked;
-			const frag_len = isFragEnabled ? (document.getElementById('input-frag-len').value || "200-3000") : "";
-			const frag_int = isFragEnabled ? (document.getElementById('input-frag-int').value || "1-2") : "";
+			const frag_len = "";
+			const frag_int = "";
+			const isAdvancedSettingsOn = document.getElementById('input-advanced-settings-toggle') ? document.getElementById('input-advanced-settings-toggle').checked : false;
+			const advanced_frag = (isAdvancedSettingsOn && document.getElementById('input-advanced-frag')) ? document.getElementById('input-advanced-frag').value.trim() : "";
+			const cipher_suites = (isAdvancedSettingsOn && document.getElementById('input-cipher-suites')) ? document.getElementById('input-cipher-suites').value.trim() : "";
+			const tls_mask = (isAdvancedSettingsOn && document.getElementById('input-tls-mask')) ? document.getElementById('input-tls-mask').value.trim() : "";
 			const isAutoReset = document.getElementById('input-auto-reset-toggle').checked;
 			const auto_reset_vol_days = isAutoReset ? parseInt(document.getElementById('input-auto-reset-vol').value) || 0 : 0;
 			const auto_reset_req_days = isAutoReset ? parseInt(document.getElementById('input-auto-reset-req').value) || 0 : 0;
@@ -5854,6 +5930,7 @@ ${COMMON_TOAST_HTML}
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ 
 						username, limit_gb: limit, expiry_days: expiry, limit_req: reqLimit, tls, port, ips, fingerprint, ip_limit: ipLimit, block_porn: block_porn, block_ads: block_ads, frag_len: frag_len, frag_int: frag_int,
+						advanced_frag: advanced_frag || null, cipher_suites: cipher_suites || null, tls_mask: tls_mask || null,
 						user_proxy_iata: null,
 						user_socks5: userSocks5 || null,
 						user_proxy_ip: null,
@@ -5903,7 +5980,7 @@ window.renderProxyFieldsUI = function() {
 		row.className = "flex flex-col gap-0.5 w-full";
 		const proxyStr = (val || "").trim();
 		const pingObj = proxyStr ? (window.proxyPingMap && window.proxyPingMap[proxyStr]) : null;
-		const pingClass = pingObj ? pingObj.className : "text-[10px] font-bold text-center empty:hidden transition-colors";
+		const pingClass = pingObj ? pingObj.className : "text-[10px] font-bold text-center block min-h-[18px] mt-0.5 transition-colors";
 		const pingText = pingObj ? pingObj.text : "";
 		
 		let countryCode = "UN";
@@ -5945,7 +6022,7 @@ window.renderProxyFieldsUI = function() {
 		wrapper.appendChild(row);
 	});
 	if (addBtn) {
-		addBtn.style.display = window.proxyFieldsData.length >= 5 ? "none" : "flex";
+		addBtn.style.display = window.proxyFieldsData.length >= 8 ? "none" : "flex";
 	}
 };
 document.addEventListener('keydown', function(event) {
@@ -6005,11 +6082,11 @@ window.updateProxyFieldData = function(idx, val) {
 	const span = document.getElementById('proxy-ping-label-' + idx);
 	if (span) {
 		span.innerText = '';
-		span.className = 'text-[10px] font-bold text-center empty:hidden transition-colors';
+		span.className = 'text-[10px] font-bold text-center block min-h-[18px] mt-0.5 transition-colors';
 	}
 };
 window.addProxyFieldUI = function() {
-	if (window.proxyFieldsData.length < 5) {
+	if (window.proxyFieldsData.length < 8) {
 		window.proxyFieldsData.push("");
 		window.activeProxyIndex = window.proxyFieldsData.length - 1;
 		window.renderProxyFieldsUI();
@@ -6031,81 +6108,107 @@ window.removeProxyFieldUI = function(idx) {
 		window.renderProxyFieldsUI();
 	}
 };
-window.swapProxyFieldUI = async function(idx) {
-	const currentProxy = (window.proxyFieldsData[idx] || "").trim();
-	if (!currentProxy) {
-		alert("⚠️ ابتدا یک پروکسی در این فیلد وارد کنید!");
-		return;
-	}
-	const icon = document.getElementById('swap-icon-' + idx);
-	if (icon) icon.classList.add('animate-spin');
-	
-	let countryCode = "UN";
-	try {
-		const controller = new AbortController();
-		const timeoutId = setTimeout(() => controller.abort(), 2000);
-		const res = await fetch('/api/test-proxy', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ proxy: currentProxy }),
-			signal: controller.signal
-		});
-		clearTimeout(timeoutId);
-		const data = await res.json();
-		if (res.ok && data.success && data.country && data.country !== "UN") {
-			countryCode = data.country.toUpperCase();
-		}
-	} catch(e) {}
-	let candidateProxies = [];
-	let isRandomFallback = false;
-	if (countryCode !== "UN") {
-		try {
-			const resVip = await fetchWithFallbackUI('proxy_vip/' + countryCode + '.txt?t=' + Date.now());
-			if (resVip.ok) {
-				const text = await resVip.text();
-				const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 5);
-				candidateProxies = candidateProxies.concat(lines);
+		window.swapProxyFieldUI = async function(idx, triggerGlobalTest = true) {
+			const currentProxy = (window.proxyFieldsData[idx] || "").trim();
+			if (!currentProxy) {
+				if (triggerGlobalTest) alert("⚠️ ابتدا یک پروکسی در این فیلد وارد کنید!");
+				return;
 			}
-		} catch(e) {}
-	}
-	if (candidateProxies.length <= 1 || countryCode === "UN") {
-		isRandomFallback = true;
-		let fallbackCountries = ["DE", "US", "GB", "NL", "FR", "TR"];
-		try {
-			const resVipList = await fetchWithFallbackUI('vip-list?t=' + Date.now());
-			if (resVipList.ok) {
-				const files = await resVipList.json();
-				const parsed = files.filter(f => f && f.name && f.name.endsWith('.txt')).map(f => f.name.replace('.txt', '').toUpperCase());
-				if (parsed.length > 0) fallbackCountries = parsed;
+			const icon = document.getElementById('swap-icon-' + idx);
+			if (icon) icon.classList.add('animate-spin');
+
+			let usedCountries = new Set();
+			try {
+				let cache = JSON.parse(localStorage.getItem('proxy_flag_cache_v2') || '{}');
+				for (let i = 0; i < window.proxyFieldsData.length; i++) {
+					if (i !== idx) {
+						let p = (window.proxyFieldsData[i] || "").trim();
+						if (p && cache[p]) {
+							usedCountries.add(cache[p].toUpperCase());
+						}
+					}
+				}
+			} catch(e) {}
+
+			let countryCode = "UN";
+			try {
+				const controller = new AbortController();
+				const timeoutId = setTimeout(() => controller.abort(), 2000);
+				const res = await fetch('/api/test-proxy', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ proxy: currentProxy }),
+					signal: controller.signal
+				});
+				clearTimeout(timeoutId);
+				const data = await res.json();
+				if (res.ok && data.success && data.country && data.country !== "UN") {
+					countryCode = data.country.toUpperCase();
+				}
+			} catch(e) {}
+
+			let candidateProxies = [];
+			let isRandomFallback = false;
+
+			if (countryCode !== "UN" && !usedCountries.has(countryCode)) {
+				try {
+					const resVip = await fetchWithFallbackUI('proxy_vip/' + countryCode + '.txt?t=' + Date.now());
+					if (resVip.ok) {
+						const text = await resVip.text();
+						const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 5);
+						candidateProxies = candidateProxies.concat(lines);
+					}
+				} catch(e) {}
 			}
-		} catch(e) {}
-		const randomCountry = fallbackCountries[Math.floor(Math.random() * fallbackCountries.length)];
-		try {
-			const resVip = await fetchWithFallbackUI('proxy_vip/' + randomCountry + '.txt?t=' + Date.now());
-			if (resVip.ok) {
-				const text = await resVip.text();
-				const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 5);
-				candidateProxies = candidateProxies.concat(lines);
+
+			if (candidateProxies.length <= 1 || countryCode === "UN" || usedCountries.has(countryCode)) {
+				isRandomFallback = true;
+				let fallbackCountries = ["DE", "US", "GB", "NL", "FR", "TR"];
+				try {
+					const resVipList = await fetchWithFallbackUI('vip-list?t=' + Date.now());
+					if (resVipList.ok) {
+						const files = await resVipList.json();
+						const parsed = files.filter(f => f && f.name && f.name.endsWith('.txt')).map(f => f.name.replace('.txt', '').toUpperCase());
+						if (parsed.length > 0) fallbackCountries = parsed;
+					}
+				} catch(e) {}
+
+				let availableCountries = fallbackCountries.filter(c => !usedCountries.has(c));
+				if (availableCountries.length === 0) {
+					availableCountries = fallbackCountries;
+				}
+
+				const randomCountry = availableCountries[Math.floor(Math.random() * availableCountries.length)];
+				try {
+					const resVip = await fetchWithFallbackUI('proxy_vip/' + randomCountry + '.txt?t=' + Date.now());
+					if (resVip.ok) {
+						const text = await resVip.text();
+						const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 5);
+						candidateProxies = candidateProxies.concat(lines);
+					}
+				} catch(e) {}
 			}
-		} catch(e) {}
-	}
-	candidateProxies = [...new Set(candidateProxies)];
-	const alternatives = candidateProxies.filter(p => p !== currentProxy);
-	if (alternatives.length > 0) {
-		const newProxy = alternatives[Math.floor(Math.random() * alternatives.length)];
-		window.proxyFieldsData[idx] = newProxy;
-		if (countryCode !== "UN" && !isRandomFallback) {
-			showToast('✅ پروکسی اختصاصی (VIP) از کشور ' + countryCode + ' جایگزین شد.');
-		} else {
-			showToast('✅ یک پروکسی اختصاصی (VIP) سالم به صورت رندوم جایگزین شد.');
-		}
-	} else {
-		window.proxyFieldsData[idx] = currentProxy;
-		showToast('⚠️ هیچ پروکسی اختصاصی جایگزینی در مخزن VIP یافت نشد!');
-	}
-	if (typeof window.renderProxyFieldsUI === 'function') window.renderProxyFieldsUI();
-	testUserSocksProxy();
-};
+
+			candidateProxies = [...new Set(candidateProxies)];
+			const alternatives = candidateProxies.filter(p => p !== currentProxy);
+
+			if (alternatives.length > 0) {
+				const newProxy = alternatives[Math.floor(Math.random() * alternatives.length)];
+				window.proxyFieldsData[idx] = newProxy;
+				if (triggerGlobalTest) {
+					if (countryCode !== "UN" && !isRandomFallback) {
+						showToast('✅ پروکسی اختصاصی (VIP) از کشور ' + countryCode + ' جایگزین شد.');
+					} else {
+						showToast('✅ یک پروکسی سالم (بدون تکرار کشور) جایگزین شد.');
+					}
+				}
+			} else {
+				window.proxyFieldsData[idx] = currentProxy;
+				if (triggerGlobalTest) showToast('⚠️ هیچ پروکسی اختصاصی جایگزینی در مخزن VIP یافت نشد!');
+			}
+			if (typeof window.renderProxyFieldsUI === 'function') window.renderProxyFieldsUI();
+			if (triggerGlobalTest) testUserSocksProxy();
+		};
 function setModalState(modalId, show) {
 			const modal = document.getElementById(modalId);
 			if (!modal) return;
@@ -6170,6 +6273,22 @@ function downloadZeusSource() {
 		function openOnlineCounterWarning() { setModalState('online-counter-warning-modal', true); }
 		function closeConfigCountWarning() { setModalState('config-count-warning-modal', false); }
 		function openConfigCountWarning() { setModalState('config-count-warning-modal', true); }
+		function togglePattNgModal(show) {
+			const modal = document.getElementById('pattng-info-modal');
+			if (!modal) return;
+			const card = modal.querySelector('div');
+			if (show) {
+				modal.classList.remove('opacity-0', 'pointer-events-none');
+				modal.classList.add('opacity-100', 'pointer-events-auto');
+				card.classList.remove('opacity-0', 'scale-95');
+				card.classList.add('opacity-100', 'scale-100');
+			} else {
+				modal.classList.remove('opacity-100', 'pointer-events-auto');
+				modal.classList.add('opacity-0', 'pointer-events-none');
+				card.classList.remove('opacity-100', 'scale-100');
+				card.classList.add('opacity-0', 'scale-95');
+			}
+		}
 	async function checkGlobalMessage() {
 		try {
 			const res = await fetchWithFallbackUI('message.txt?t=' + Date.now());
@@ -6264,9 +6383,11 @@ function downloadZeusSource() {
 					resolvedProxies.forEach((proxy) => {
 						const isTlsPort = ["443", "2053", "2083", "2087", "2096", "8443"].includes(portStr);
 						const tlsVal = isTlsPort ? "tls" : "none";
-						const advancedCs = "TLS_AES_256_GCM_SHA384%3ATLS_CHACHA20_POLY1305_SHA256%3ATLS_AES_128_GCM_SHA256%3ATLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384%3ATLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384%3ATLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256%3ATLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256%3ATLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256%3ATLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256%3ATLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA%3ATLS_ECDHE_RSA_WITH_AES_256_CBC_SHA%3ATLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256%3ATLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256";
-						const advancedFm = "%7B%22tcp%22%3A%5B%7B%22type%22%3A%22fragment%22%2C%22settings%22%3A%7B%22packets%22%3A%22tlshello%22%2C%22lengths%22%3A%5B%225%22%2C%2294%22%2C%221%22%5D%2C%22delays%22%3A%5B%220%22%5D%2C%22maxSplit%22%3A%220%22%7D%7D%2C%7B%22type%22%3A%22fragment%22%2C%22settings%22%3A%7B%22packets%22%3A%221-1%22%2C%22lengths%22%3A%5B%22109%22%2C%221%22%5D%2C%22delays%22%3A%5B%221%22%5D%2C%22maxSplit%22%3A%22355%22%7D%7D%5D%7D";
-						const userFrag = isTlsPort ? "&cs=" + advancedCs + "&fm=" + advancedFm : "&fm=" + advancedFm;
+						let userFrag = "";
+						if (user.advanced_frag) userFrag += "&fm=" + encodeURIComponent(user.advanced_frag);
+						if (isTlsPort && user.cipher_suites) userFrag += "&cs=" + encodeURIComponent(user.cipher_suites);
+						if (user.tls_mask) userFrag += "&mask=" + encodeURIComponent(user.tls_mask);
+						
 						const remark = "ZEUS | " + proxy.flagEmoji + " | " + user.username;
 						links.push('vle' + 'ss://' + (user.uuid || '') + '@' + ip + ':' + portStr + '?path=' + proxy.currentDynPath + '&security=' + tlsVal + '&encryption=none&insecure=0&host=' + host + '&fp=' + fp + '&type=ws&allowInsecure=0&sni=' + host + userFrag + '#' + encodeURIComponent(remark));
 					});
@@ -6390,6 +6511,16 @@ function editUser(encodedUsername) {
 	document.getElementById('hidden-ip-count').value = user.ip_count || '20';
 	document.getElementById('input-block-porn').checked = (user.block_porn === 1);
 	document.getElementById('input-block-ads').checked = (user.block_ads === 1);
+	const advFragInput = document.getElementById('input-advanced-frag');
+	if (advFragInput) advFragInput.value = user.advanced_frag || '';
+	const csInput = document.getElementById('input-cipher-suites');
+	if (csInput) csInput.value = user.cipher_suites || '';
+	const maskInput = document.getElementById('input-tls-mask');
+	if (maskInput) maskInput.value = user.tls_mask || '';
+	const hasAdvSettings = Boolean(user.advanced_frag || user.cipher_suites || user.tls_mask);
+	const advSettingsToggle = document.getElementById('input-advanced-settings-toggle');
+	if (advSettingsToggle) advSettingsToggle.checked = hasAdvSettings;
+	if (typeof window.toggleAdvancedSettingsInputs === 'function') window.toggleAdvancedSettingsInputs(hasAdvSettings);
 	const autoRotateUserProxyCheck = document.getElementById('input-auto-rotate-user-proxy');
 	if (autoRotateUserProxyCheck) autoRotateUserProxyCheck.checked = (user.auto_rotate_user_proxy === 1);
 	const hasAutoReset = Boolean((user.auto_reset_vol_days && user.auto_reset_vol_days > 0) || (user.auto_reset_req_days && user.auto_reset_req_days > 0));
@@ -6398,12 +6529,7 @@ function editUser(encodedUsername) {
 	document.getElementById('input-auto-reset-vol').value = hasAutoReset && user.auto_reset_vol_days > 0 ? user.auto_reset_vol_days : '';
 	document.getElementById('input-auto-reset-req').value = hasAutoReset && user.auto_reset_req_days > 0 ? user.auto_reset_req_days : '';
 	window.toggleAutoResetInputs(hasAutoReset);
-	const hasFrag = Boolean(user.frag_len && user.frag_len !== "" && user.frag_int && user.frag_int !== "");
-	const fragToggle = document.getElementById('input-frag-toggle');
-	if (fragToggle) fragToggle.checked = hasFrag;
-	document.getElementById('input-frag-len').value = hasFrag ? user.frag_len : '200-3000';
-	document.getElementById('input-frag-int').value = hasFrag ? user.frag_int : '1-2';
-	window.toggleFragInputs(hasFrag);
+	
 	const userPorts = String(user.port || '').split(',').map(p => p.trim());
 	const predefinedPorts = [...tlsPorts, ...nonTlsPorts];
 	const customPorts = userPorts.filter(p => !predefinedPorts.includes(p) && p !== '');
@@ -6481,6 +6607,18 @@ window.toggleGfx = function(isChecked) {
 	setTimeout(() => window.location.reload(), 1500);
 };
 
+window.fillPatternihaValues = function() {
+	const fragInput = document.getElementById('input-advanced-frag');
+	const csInput = document.getElementById('input-cipher-suites');
+	if (fragInput) {
+		fragInput.value = '{"tcp": [{"type": "fragment", "settings": {"packets": "tlshello", "lengths": ["5", "94", "1"], "delays": ["0"], "maxSplit": "0"}},{"type": "fragment", "settings": {"packets": "1-1", "lengths": ["109", "1"], "delays": ["1"], "maxSplit": "355"}}]}';
+	}
+	if (csInput) {
+		csInput.value = 'TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256:TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384:TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384:TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256:TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256:TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA:TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA:TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256:TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256';
+	}
+	showToast('✅ مقادیر پیش‌فرض Patterniha با موفقیت اعمال شد.');
+};
+
 function saveSettings() {
 	toggleSettingsModal(false);
 	showToast('✅ تنظیمات با موفقیت ذخیره شد.');
@@ -6545,7 +6683,9 @@ async function testUserSocksProxy() {
 		btn.innerText = 'صبر کنید...';
 	}
 	window.proxyPingMap = {};
-	
+	const autoRotateCheck = document.getElementById('input-auto-rotate-user-proxy');
+	const isAutoRotate = autoRotateCheck ? autoRotateCheck.checked : false;
+
 	for (let idx = 0; idx < window.proxyFieldsData.length; idx++) {
 		const resultSpan = document.getElementById('proxy-ping-label-' + idx);
 		const proxyStr = (window.proxyFieldsData[idx] || "").trim();
@@ -6561,60 +6701,114 @@ async function testUserSocksProxy() {
 	}
 
 	for (let idx = 0; idx < window.proxyFieldsData.length; idx++) {
-		const val = window.proxyFieldsData[idx];
-		const proxyStr = (val || "").trim();
+		let proxyStr = (window.proxyFieldsData[idx] || "").trim();
 		if (!proxyStr) continue;
-
-		const resultSpan = document.getElementById('proxy-ping-label-' + idx);
+		
+		let resultSpan = document.getElementById('proxy-ping-label-' + idx);
 		if (resultSpan) {
 			resultSpan.innerText = 'در حال تست...';
 			resultSpan.className = 'text-[10px] font-bold text-amber-500 block mt-0.5 text-center';
 		}
 
-		const controller = new AbortController();
-		const timeoutId = setTimeout(() => controller.abort(), 8000); 
-		try {
-			const res = await fetch('/api/test-proxy', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ proxy: proxyStr }),
-				signal: controller.signal
-			});
-			clearTimeout(timeoutId);
-			const data = await res.json();
-			if (res.ok && data.success) {
-				const flag = typeof getFlagEmoji === 'function' ? getFlagEmoji(data.country) : '🌐';
-				if (resultSpan) {
-					resultSpan.innerHTML = flag + ' پینگ: ' + data.ping + 'ms';
-					resultSpan.className = 'text-[10px] font-bold text-green-600 block mt-0.5 text-center';
-					window.proxyPingMap[proxyStr] = { text: resultSpan.innerHTML, className: resultSpan.className };
+		const checkProxy = async (targetProxy) => {
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 8000); 
+			try {
+				const res = await fetch('/api/test-proxy', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ proxy: targetProxy }),
+					signal: controller.signal
+				});
+				clearTimeout(timeoutId);
+				const data = await res.json();
+				return { ok: res.ok, data };
+			} catch (e) {
+				clearTimeout(timeoutId);
+				return { ok: false, error: e.name === 'AbortError' ? 'تایم‌اوت' : 'خطا در ارتباط' };
+			}
+		};
+
+		let testRes = await checkProxy(proxyStr);
+
+		if (testRes.ok && testRes.data.success) {
+			resultSpan = document.getElementById('proxy-ping-label-' + idx);
+			const flag = typeof getFlagEmoji === 'function' ? getFlagEmoji(testRes.data.country) : '🌐';
+			if (resultSpan) {
+				resultSpan.innerHTML = flag + ' پینگ: ' + testRes.data.ping + 'ms';
+				resultSpan.className = 'text-[10px] font-bold text-green-600 block mt-0.5 text-center';
+				window.proxyPingMap[proxyStr] = { text: resultSpan.innerHTML, className: resultSpan.className };
+			}
+			if (testRes.data.country) {
+				try {
+					let cache = JSON.parse(localStorage.getItem('proxy_flag_cache_v2') || '{}');
+					cache[proxyStr] = testRes.data.country.toUpperCase();
+					localStorage.setItem('proxy_flag_cache_v2', JSON.stringify(cache));
+					if (typeof window.renderProxyFieldsUI === 'function') window.renderProxyFieldsUI();
+				} catch(e) {}
+			}
+		} else {
+			if (isAutoRotate) {
+				let swapSuccess = false;
+				let maxSwaps = 4; // حداکثر تلاش برای یافتن پروکسی سالم
+				let currentBadProxy = proxyStr;
+
+				for (let attempt = 1; attempt <= maxSwaps; attempt++) {
+					resultSpan = document.getElementById('proxy-ping-label-' + idx);
+					if (resultSpan) {
+						resultSpan.innerText = 'خراب بود، تعویض (' + attempt + '/' + maxSwaps + ')...';
+						resultSpan.className = 'text-[10px] font-bold text-blue-500 block mt-0.5 text-center';
+					}
+					
+					await window.swapProxyFieldUI(idx, false);
+					const newProxy = (window.proxyFieldsData[idx] || "").trim();
+					
+					if (newProxy && newProxy !== currentBadProxy) {
+						resultSpan = document.getElementById('proxy-ping-label-' + idx);
+						if (resultSpan) {
+							resultSpan.innerText = 'تست پروکسی جدید (' + attempt + ')...';
+							resultSpan.className = 'text-[10px] font-bold text-amber-500 block mt-0.5 text-center';
+						}
+						let newTestRes = await checkProxy(newProxy);
+						resultSpan = document.getElementById('proxy-ping-label-' + idx);
+						
+						if (newTestRes.ok && newTestRes.data.success) {
+							const flag = typeof getFlagEmoji === 'function' ? getFlagEmoji(newTestRes.data.country) : '🌐';
+							if (resultSpan) {
+								resultSpan.innerHTML = flag + ' پینگ: ' + newTestRes.data.ping + 'ms';
+								resultSpan.className = 'text-[10px] font-bold text-green-600 block mt-0.5 text-center';
+								window.proxyPingMap[newProxy] = { text: resultSpan.innerHTML, className: resultSpan.className };
+							}
+							swapSuccess = true;
+							break; // پروکسی سالم پیدا شد، از حلقه خارج شو
+						} else {
+							currentBadProxy = newProxy; // پروکسی جدید هم خراب بود، آپدیتش کن تا دفعه بعد یکی دیگه بگیره
+						}
+					} else {
+						break; // کلاً جایگزینی تو مخزن نبود
+					}
 				}
-				if (data.country) {
-					try {
-						let cache = JSON.parse(localStorage.getItem('proxy_flag_cache_v2') || '{}');
-						cache[proxyStr] = data.country.toUpperCase();
-						localStorage.setItem('proxy_flag_cache_v2', JSON.stringify(cache));
-						if (typeof window.renderProxyFieldsUI === 'function') window.renderProxyFieldsUI();
-					} catch(e) {}
+
+				if (!swapSuccess) {
+					resultSpan = document.getElementById('proxy-ping-label-' + idx);
+					if (resultSpan) {
+						resultSpan.innerText = 'چندین پروکسی جایگزین تست شد اما همه خراب بودند!';
+						resultSpan.className = 'text-[10px] font-bold text-red-500 block mt-0.5 text-center';
+						const finalProxy = (window.proxyFieldsData[idx] || "").trim();
+						window.proxyPingMap[finalProxy] = { text: resultSpan.innerText, className: resultSpan.className };
+					}
 				}
 			} else {
+				resultSpan = document.getElementById('proxy-ping-label-' + idx);
 				if (resultSpan) {
-					resultSpan.innerText = 'خطا: ' + (data.error || 'ناموفق');
+					const errMsg = testRes.data ? (testRes.data.error || 'ناموفق') : testRes.error;
+					resultSpan.innerText = 'خطا: ' + errMsg;
 					resultSpan.className = 'text-[10px] font-bold text-red-500 block mt-0.5 break-words text-center';
 					window.proxyPingMap[proxyStr] = { text: resultSpan.innerText, className: resultSpan.className };
 				}
 			}
-		} catch (e) {
-			clearTimeout(timeoutId);
-			if (resultSpan) {
-				if (e.name === 'AbortError') resultSpan.innerText = 'تایم‌اوت (خراب)';
-				else resultSpan.innerText = 'خطا در ارتباط';
-				resultSpan.className = 'text-[10px] font-bold text-red-500 block mt-0.5 text-center';
-				window.proxyPingMap[proxyStr] = { text: resultSpan.innerText, className: resultSpan.className };
-			}
 		}
 	}
-	
 	if (btn) {
 		btn.disabled = false;
 		btn.innerText = 'تست پـروکـسـی';
@@ -6850,7 +7044,7 @@ async function testUserSocksProxy() {
 				window.location.reload();
 			}
 		}
-const CURRENT_VERSION = '1.11.10';
+const CURRENT_VERSION = '1.11.11';
 const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
 		window.autoUpdateStatusCache = false;
 		async function checkAutoUpdateSetup() {
@@ -7247,6 +7441,7 @@ function applySelectedIps() {
 				if (e.target.id === 'free-panel-warning-modal') closeFreePanelWarning();
 				if (e.target.id === 'online-counter-warning-modal') closeOnlineCounterWarning();
 				if (e.target.id === 'config-count-warning-modal') closeConfigCountWarning();
+				if (e.target.id === 'pattng-info-modal') togglePattNgModal(false);
 				if (e.target.id === 'global-message-modal') {
 					const closeBtn = document.getElementById('global-message-close-btn');
 					if (closeBtn) closeBtn.click();
@@ -7928,9 +8123,11 @@ ${COMMON_TOAST_HTML}
 					resolvedProxies.forEach((proxy) => {
 						const isTlsPort = ["443", "2053", "2083", "2087", "2096", "8443"].includes(portStr);
 						const tlsVal = isTlsPort ? "tls" : "none";
-						const advancedCs = "TLS_AES_256_GCM_SHA384%3ATLS_CHACHA20_POLY1305_SHA256%3ATLS_AES_128_GCM_SHA256%3ATLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384%3ATLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384%3ATLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256%3ATLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256%3ATLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256%3ATLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256%3ATLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA%3ATLS_ECDHE_RSA_WITH_AES_256_CBC_SHA%3ATLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256%3ATLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256";
-						const advancedFm = "%7B%22tcp%22%3A%5B%7B%22type%22%3A%22fragment%22%2C%22settings%22%3A%7B%22packets%22%3A%22tlshello%22%2C%22lengths%22%3A%5B%225%22%2C%2294%22%2C%221%22%5D%2C%22delays%22%3A%5B%220%22%5D%2C%22maxSplit%22%3A%220%22%7D%7D%2C%7B%22type%22%3A%22fragment%22%2C%22settings%22%3A%7B%22packets%22%3A%221-1%22%2C%22lengths%22%3A%5B%22109%22%2C%221%22%5D%2C%22delays%22%3A%5B%221%22%5D%2C%22maxSplit%22%3A%22355%22%7D%7D%5D%7D";
-						const userFrag = isTlsPort ? "&cs=" + advancedCs + "&fm=" + advancedFm : "&fm=" + advancedFm;
+						let userFrag = "";
+						if (u.advanced_frag) userFrag += "&fm=" + encodeURIComponent(u.advanced_frag);
+						if (isTlsPort && u.cipher_suites) userFrag += "&cs=" + encodeURIComponent(u.cipher_suites);
+						if (u.tls_mask) userFrag += "&mask=" + encodeURIComponent(u.tls_mask);
+						
 						const remark = "ZEUS | " + proxy.flagEmoji + " | " + u.username;
 						links.push('vle' + 'ss://' + (u.uuid || '') + '@' + ip + ':' + portStr + '?path=' + proxy.currentDynPath + '&security=' + tlsVal + '&encryption=none&insecure=0&host=' + host + '&fp=' + fp + '&type=ws&allowInsecure=0&sni=' + host + userFrag + '#' + encodeURIComponent(remark));
 					});
