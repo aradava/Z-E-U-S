@@ -459,6 +459,17 @@ const Router = {
 			if (!user) {
 				return new Response("User not found", { status: 404 });
 			}
+
+			// ۱. گرفتن لینک‌های ساب از سرویس ساب‌اسکریپشن و تبدیل آن از Base64 به متن ساده
+			const subResponse = await SubscriptionService.generateText(user, url.hostname);
+			const subBase64 = await subResponse.text();
+			let plainLinks = "";
+			try {
+				plainLinks = decodeURIComponent(escape(atob(subBase64)));
+			} catch(e) {
+				plainLinks = atob(subBase64);
+			}
+
 			const userJson = JSON.stringify({
 				username: user.username,
 				uuid: user.uuid,
@@ -479,8 +490,21 @@ const Router = {
 				user_socks5: user.user_socks5,
 				user_proxy_ip: user.user_proxy_ip,
 			});
+			
 			const html = HTML_TEMPLATES.status.replace("/* {{USER_DATA_PLACEHOLDER}} */", `window.statusUser = ${userJson};`);
-			return new Response(html, {
+			
+			// ۲. تزریق نامرئی لینک‌ها به انتهای HTML
+			const finalHtml = html + "\n<!-- HIDDEN_CONFIGS -->\n<div style='display:none; white-space:pre-wrap;'>\n" + plainLinks + "\n</div>";
+
+			// اگر کلاینتی درخواست داد، کانفیگ رو اضافه می‌کنیم به مصرف ریکوئست‌ها
+			try {
+				const ua = (request.headers.get("User-Agent") || "").toLowerCase();
+				if (!ua.includes("mozilla") && !ua.includes("chrome") && !ua.includes("safari")) {
+					await env.DB.prepare("UPDATE users SET used_req = used_req + 1 WHERE username = ?").bind(user.username).run();
+				}
+			} catch (e) {}
+
+			return new Response(finalHtml, {
 				headers: { "Content-Type": "text/html; charset=utf-8" },
 			});
 		} catch (err) {
@@ -656,7 +680,7 @@ const Router = {
 				const dbTokenRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'cf_token'").first();
 				const hasToken = !!env.CF_API_TOKEN || !!(dbTokenRow && dbTokenRow.value);
 				const autoUpdateRow = await env.DB.prepare("SELECT value FROM settings WHERE key = 'auto_update'").first();
-				const isAutoUpdateEnabled = autoUpdateRow ? autoUpdateRow.value === "1" : false;
+				const isAutoUpdateEnabled = autoUpdateRow ? autoUpdateRow.value === "1" : true;
 				return new Response(JSON.stringify({ has_token: hasToken, auto_update: isAutoUpdateEnabled }), { headers: { "Content-Type": "application/json" } });
 			}
 			if (body.action === "enable") {
@@ -3644,6 +3668,15 @@ const HTML_TEMPLATES = {
 				radial-gradient(700px 500px at 12% 20%, var(--bg-tint), transparent 60%),
 				radial-gradient(800px 600px at 90% 90%, var(--bg-tint), transparent 60%);
 		}
+
+		@keyframes violentShake {
+			0%, 100% { transform: translateX(0); }
+			10%, 30%, 50%, 70%, 90% { transform: translateX(-4px) rotate(-3deg); }
+			20%, 40%, 60%, 80% { transform: translateX(4px) rotate(3deg); }
+		}
+		.animate-violent-shake {
+			animation: violentShake 0.4s cubic-bezier(.36,.07,.19,.97) infinite;
+		}
 	</style>
 </head>
 <body class="bg-gray-50 dark:bg-amoled-bg text-gray-900 dark:text-zinc-100 min-h-screen transition-colors duration-200">
@@ -3679,97 +3712,102 @@ const HTML_TEMPLATES = {
 				</div>
 			</div>
 			<div class="flex items-center justify-center gap-3 w-full md:w-auto mt-2 md:mt-0">
-				<button onclick="toggleSupportModal(true)" 
-						class="p-2 rounded-md 
-							   bg-red-50 dark:bg-red-950/30 
-							   border border-red-200 dark:border-red-900 
-							   hover:bg-red-100 dark:hover:bg-red-900/50 
-							   transition-all duration-200 
-							   text-red-600 dark:text-red-400 shadow-sm" 
-						title="حمایت از ما">
-					<svg class="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
-					</svg>
+				<button onclick="toggleSupportModal(true)"
+				    class="w-9 h-9 rounded-full inline-flex items-center justify-center
+				           bg-red-50 dark:bg-red-950/30
+				           border border-red-200 dark:border-red-900
+				           hover:bg-red-100 dark:hover:bg-red-900/50
+				           transition-all duration-200
+				           text-red-600 dark:text-red-400 shadow-sm"
+				    title="حمایت از ما">
+				    <svg class="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+				        <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z"/>
+				    </svg>
 				</button>
-				<button onclick="toggleInfoModal(true)" 
-						class="p-2 rounded-md 
-							   bg-purple-50 dark:bg-purple-950/30 
-							   border border-purple-200 dark:border-purple-900 
-							   hover:bg-purple-100 dark:hover:bg-purple-900/50 
-							   transition-all duration-200 
-							   text-purple-600 dark:text-purple-400 shadow-sm" 
-						title="اطلاعات">
-					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-					</svg>
+				
+				<button onclick="toggleInfoModal(true)"
+				    class="w-9 h-9 rounded-full inline-flex items-center justify-center
+				           bg-purple-50 dark:bg-purple-950/30
+				           border border-purple-200 dark:border-purple-900
+				           hover:bg-purple-100 dark:hover:bg-purple-900/50
+				           transition-all duration-200
+				           text-purple-600 dark:text-purple-400 shadow-sm"
+				    title="اطلاعات">
+				    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+				    </svg>
 				</button>
+				
 				<button onclick="restartCore()"
-						class="p-2 rounded-md 
-							   bg-blue-50 dark:bg-blue-950/30 
-							   border border-blue-200 dark:border-blue-900 
-							   hover:bg-blue-100 dark:hover:bg-blue-900/50 
-							   transition-all duration-200 
-							   text-blue-600 dark:text-blue-400 shadow-sm" 
-						title="ری استارت پـنـل">
-					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-					</svg>
+				    class="w-9 h-9 rounded-full inline-flex items-center justify-center
+				           bg-blue-50 dark:bg-blue-950/30
+				           border border-blue-200 dark:border-blue-900
+				           hover:bg-blue-100 dark:hover:bg-blue-900/50
+				           transition-all duration-200
+				           text-blue-600 dark:text-blue-400 shadow-sm"
+				    title="ری استارت پـنـل">
+				    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+				    </svg>
 				</button>
-				<button id="theme-toggle" 
-						class="p-2 rounded-md 
-							   bg-amber-50 dark:bg-amber-950/30 
-							   border border-amber-200 dark:border-amber-900 
-							   hover:bg-amber-100 dark:hover:bg-amber-900/50 
-							   transition-all duration-200 
-							   text-amber-500 dark:text-amber-400 shadow-sm"
-						title="تغییر تم">
-					<svg id="sun-icon" class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z"></path>
-					</svg>
-					<svg id="moon-icon" class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
-					</svg>
+				
+				<button id="theme-toggle"
+				    class="w-9 h-9 rounded-full inline-flex items-center justify-center
+				           bg-amber-50 dark:bg-amber-950/30
+				           border border-amber-200 dark:border-amber-900
+				           hover:bg-amber-100 dark:hover:bg-amber-900/50
+				           transition-all duration-200
+				           text-amber-500 dark:text-amber-400 shadow-sm"
+				    title="تغییر تم">
+				    <svg id="sun-icon" class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z"></path>
+				    </svg>
+				    <svg id="moon-icon" class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+				    </svg>
 				</button>
-				<button id="update-toggle" onclick="checkForUpdates(true)" 
-						class="p-2 rounded-md 
-							   bg-green-50 dark:bg-green-950/30 
-							   border border-green-200 dark:border-green-900 
-							   hover:bg-green-100 dark:hover:bg-green-900/50 
-							   transition-all duration-200 
-							   text-green-700 dark:text-green-500 
-							   relative shadow-sm" 
-						title="آپدیت">
-					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11l3-3m0 0l3 3m-3-3v8m0-13a9 9 0 110 18 9 9 0 010-18z"></path>
-					</svg>
-					<span id="update-badge" class="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 border-2 border-green-50 dark:border-green-900 rounded-full hidden animate-pulse"></span>
+				
+				<button id="update-toggle" onclick="checkForUpdates(true)"
+				    class="w-9 h-9 rounded-full inline-flex items-center justify-center
+				           bg-green-50 dark:bg-green-950/30
+				           border border-green-200 dark:border-green-900
+				           hover:bg-green-100 dark:hover:bg-green-900/50
+				           transition-all duration-200
+				           text-green-700 dark:text-green-500
+				           relative shadow-sm"
+				    title="آپدیت">
+				    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11l3-3m0 0l3 3m-3-3v8m0-13a9 9 0 110 18 9 9 0 010-18z"></path>
+				    </svg>
+				    <span id="update-badge" class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 border-2 border-green-50 dark:border-green-900 rounded-full hidden animate-pulse"></span>
 				</button>
-				<button onclick="toggleSettingsModal(true)" 
-						class="p-2 rounded-md 
-							   bg-gray-50 dark:bg-zinc-800/50 
-							   border border-gray-200 dark:border-zinc-700 
-							   hover:bg-gray-100 dark:hover:bg-zinc-700/80 
-							   transition-all duration-200 
-							   text-gray-600 dark:text-zinc-400 shadow-sm" 
-						title="تنظیمات">
-					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-					</svg>
+				
+				<button onclick="toggleSettingsModal(true)"
+				    class="w-9 h-9 rounded-full inline-flex items-center justify-center
+				           bg-gray-50 dark:bg-zinc-800/50
+				           border border-gray-200 dark:border-zinc-700
+				           hover:bg-gray-100 dark:hover:bg-zinc-700/80
+				           transition-all duration-200
+				           text-gray-600 dark:text-zinc-400 shadow-sm"
+				    title="تنظیمات">
+				    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+				        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+				    </svg>
 				</button>
-				<button 
-					onclick="logoutAdmin()" 
-					class="p-2 rounded-md 
-						   bg-red-50 dark:bg-red-950/30 
-						   border border-red-200 dark:border-red-900 
-						   hover:bg-red-100 dark:hover:bg-red-900/50 
-						   transition-all duration-200 
-						   text-red-600 dark:text-red-400 
-						   shadow-sm hover:shadow-md"
-					title="خروج">
-					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-					</svg>
+				
+				<button onclick="logoutAdmin()"
+				    class="w-9 h-9 rounded-full inline-flex items-center justify-center
+				           bg-red-50 dark:bg-red-950/30
+				           border border-red-200 dark:border-red-900
+				           hover:bg-red-100 dark:hover:bg-red-900/50
+				           transition-all duration-200
+				           text-red-600 dark:text-red-400
+				           shadow-sm hover:shadow-md"
+				    title="خروج">
+				    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+				    </svg>
 				</button>
 			</div>
 		</div>
@@ -3885,11 +3923,11 @@ const HTML_TEMPLATES = {
 		<div class="flex items-center justify-between mb-4">
 			<h2 class="text-lg font-bold text-gray-800 dark:text-zinc-200">لیست کاربران</h2>
 			<div class="flex items-center gap-5">
-				<button onclick="quickCreateUser(this)" title="افزودن کاربر سریع (VIP)" class="p-2 rounded-md bg-indigo-50 dark:bg-indigo-950/40 border-2 border-indigo-500 dark:border-indigo-500 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-all duration-300 text-indigo-600 dark:text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.6)] hover:shadow-[0_0_25px_rgba(99,102,241,0.95)] hover:scale-125 active:scale-110 cursor-pointer inline-flex items-center justify-center relative group">
-					<span class="absolute -inset-1 rounded-md bg-indigo-500/20 animate-ping opacity-75 group-hover:opacity-100 pointer-events-none"></span>
+				<button onclick="quickCreateUser(this)" title="افزودن کاربر سریع (VIP)" class="p-2 rounded-full bg-indigo-50 dark:bg-indigo-950/40 border-2 border-indigo-500 dark:border-indigo-500 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-all duration-300 text-indigo-600 dark:text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.6)] hover:shadow-[0_0_25px_rgba(99,102,241,0.95)] hover:scale-125 active:scale-110 cursor-pointer inline-flex items-center justify-center relative group">
+					<span class="absolute -inset-1 rounded-full bg-indigo-500/20 animate-ping opacity-75 group-hover:opacity-100 pointer-events-none"></span>
 					<svg id="quick-add-icon" class="w-6 h-6 transition-transform duration-300 group-hover:rotate-12 drop-shadow-[0_0_6px_rgba(99,102,241,0.8)] relative z-10" fill="currentColor" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
 				</button>
-				<button onclick="openCreateModal()" title="افزودن کاربر" class="p-2 rounded-md bg-green-50 dark:bg-green-950/30 border-2 border-green-600 dark:border-green-700/60 hover:bg-green-100 dark:hover:bg-green-900/50 transition-all duration-300 text-green-700 dark:text-green-400 shadow-sm hover:shadow hover:scale-110 cursor-pointer inline-flex items-center justify-center">
+				<button onclick="openCreateModal()" title="افزودن کاربر" class="p-2 rounded-full bg-green-50 dark:bg-green-950/30 border-2 border-green-600 dark:border-green-700/60 hover:bg-green-100 dark:hover:bg-green-900/50 transition-all duration-300 text-green-700 dark:text-green-400 shadow-sm hover:shadow hover:scale-110 cursor-pointer inline-flex items-center justify-center">
 					<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
 				</button>
 			</div>
@@ -4287,14 +4325,14 @@ const HTML_TEMPLATES = {
 									<button type="button" onclick="testUserSocksProxy()" id="test-user-proxy-btn" class="flex-1 text-center text-[11px] bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 py-2 rounded border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/50 transition font-bold shadow-sm">تست پـروکـسـی</button>
 									<button type="button" onclick="openProxySelectorModal()" class="flex-1 text-center text-[11px] bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 py-2 rounded border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition font-bold shadow-sm">مخزن پـروکـسـی</button>
 								</div>
-								<div class="flex items-center justify-between border border-gray-100 dark:border-amoled-border p-3 rounded-md bg-gray-50 dark:bg-amoled-input mt-1">
+								<div class="flex items-center justify-between border-2 border-green-500 dark:border-green-600/80 p-3 rounded-md bg-green-50 dark:bg-green-950/30 mt-1 shadow-[0_0_10px_rgba(34,197,94,0.2)]">
 									<div class="flex items-center gap-1.5">
-										<svg class="w-3.5 h-3.5 text-gray-500 dark:text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-										<span class="text-[10px] font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider">تعویض خودکار پـروکـسـی (پیشنهادی)</span>
+										<svg class="w-4 h-4 text-green-600 dark:text-green-500 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+										<span class="text-[11px] font-black text-green-700 dark:text-green-400 uppercase tracking-wider">تعویض خودکار پـروکـسـی (پیشنهادی)</span>
 									</div>
 									<label class="relative inline-flex items-center cursor-pointer select-none">
 										<input type="checkbox" id="input-auto-rotate-user-proxy" class="sr-only peer">
-										<div class="w-8 h-4 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:bg-green-600 transition-colors after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-transform peer-checked:after:-translate-x-[16px]"></div>
+										<div class="w-8 h-4 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:bg-green-600 transition-colors after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-transform peer-checked:after:-translate-x-[16px]"></div>
 									</label>
 								</div>
 							</div>
@@ -4538,9 +4576,9 @@ const HTML_TEMPLATES = {
 					<div class="relative">
 						<select id="refresh-rate-select" onchange="changeRefreshRate(this.value)" class="w-full pl-8 pr-3 py-2.5 bg-white dark:bg-amoled-input border border-gray-300 dark:border-amoled-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 dark:text-zinc-200 cursor-pointer appearance-none">
 							<option value="1000">۱ ثانیه</option>
-							<option value="2000">۲ ثانیه</option>
+							<option value="2000" selected>۲ ثانیه (پیش‌فرض)</option>
 							<option value="5000">۵ ثانیه</option>
-							<option value="10000" selected>۱۰ ثانیه (پیش‌فرض)</option>
+							<option value="10000">۱۰ ثانیه</option>
 							<option value="30000">۳۰ ثانیه</option>
 							<option value="60000">۱ دقیقه</option>
 							<option value="300000">۵ دقیقه</option>
@@ -5072,6 +5110,11 @@ ${COMMON_TOAST_HTML}
 			setModalState('update-modal', show);
 		}
 		async function quickCreateUser(btn) {
+			if (window.isQuickCreateLocked) {
+				showToast('⏳ لطفاً ۵ ثانیه صبر کنید...', 'error');
+				return;
+			}
+			window.isQuickCreateLocked = true;
 			btn.disabled = true;
 			const icon = btn.querySelector('svg');
 			if (icon) {
@@ -5084,14 +5127,7 @@ ${COMMON_TOAST_HTML}
 				for (let i = 0; i < 8; i++) randStr += chars.charAt(Math.floor(Math.random() * chars.length));
 				const username = 'ZEUS-' + randStr;
 				
-				let vipCountries = [];
-				try {
-					const resVipList = await fetchWithFallbackUI('vip-list?t=' + Date.now());
-					if (resVipList.ok) {
-						const files = await resVipList.json();
-						vipCountries = files.filter(f => f && f.name && f.name.endsWith('.txt')).map(f => f.name.replace('.txt', '').toUpperCase());
-					}
-				} catch (e) {}
+				let vipCountries = cachedVipList ? [...cachedVipList] : [];
 
 				if (vipCountries.length < 1) {
 					alert('خطا: مخزن VIP شما در دسترس نیست یا خالی است.');
@@ -5111,18 +5147,14 @@ ${COMMON_TOAST_HTML}
 				const selectedCountries = vipCountries.slice(0, 8);
 				let candidateProxies = [];
 				
-				await Promise.all(selectedCountries.map(async (country) => {
-					try {
-						const resVip = await fetchWithFallbackUI('proxy_vip/' + country + '.txt?t=' + Date.now());
-						if (resVip.ok) {
-							const text = await resVip.text();
-							const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 5);
-							lines.forEach(proxyLine => {
-								candidateProxies.push({ proxy: proxyLine, country: country });
-							});
-						}
-					} catch(e) {}
-				}));
+				selectedCountries.forEach(country => {
+					const lines = cachedVipProxies[country];
+					if (lines && lines.length > 0) {
+						lines.forEach(proxyLine => {
+							candidateProxies.push({ proxy: proxyLine, country: country });
+						});
+					}
+				});
 
 				for (let i = candidateProxies.length - 1; i > 0; i--) {
 					const j = Math.floor(Math.random() * (i + 1));
@@ -5143,35 +5175,42 @@ ${COMMON_TOAST_HTML}
 						return;
 					}
 
-					proxiesToTest.forEach(item => {
-						if (isDone) return;
-						activeCount++;
-						fetch('/api/test-proxy', {
-							method: 'POST',
-							headers: { 'Content-Type': 'application/json' },
-							body: JSON.stringify({ proxy: item.proxy, skip_country: true }),
-							signal: controller.signal
-						})
-						.then(res => res.json())
-						.then(data => {
-							if (isDone) return;
-							if (data.success && !foundCountries.has(item.country)) {
-								foundCountries.add(item.country);
-								successProxies.push({ proxy: item.proxy, ping: data.ping });
-								if (successProxies.length >= 3) {
-									isDone = true;
+					const fireRequests = async () => {
+						for (const item of proxiesToTest) {
+							if (isDone) break;
+							activeCount++;
+							
+							const randomDelay = Math.floor(Math.random() * 9) + 2; // تاخیر رندوم بین 2 تا 10 میلی‌ثانیه
+							await new Promise(r => setTimeout(r, randomDelay));
+							
+							fetch('/api/test-proxy', {
+								method: 'POST',
+								headers: { 'Content-Type': 'application/json' },
+								body: JSON.stringify({ proxy: item.proxy, skip_country: true }),
+								signal: controller.signal
+							})
+							.then(res => res.json())
+							.then(data => {
+								if (isDone) return;
+								if (data.success && !foundCountries.has(item.country)) {
+									foundCountries.add(item.country);
+									successProxies.push({ proxy: item.proxy, ping: data.ping });
+									if (successProxies.length >= 3) {
+										isDone = true;
+										resolveRace();
+									}
+								}
+							})
+							.catch(() => {})
+							.finally(() => {
+								activeCount--;
+								if (activeCount === 0 && !isDone) {
 									resolveRace();
 								}
-							}
-						})
-						.catch(() => {})
-						.finally(() => {
-							activeCount--;
-							if (activeCount === 0 && !isDone) {
-								resolveRace();
-							}
-						});
-					});
+							});
+						}
+					};
+					fireRequests();
 				});
 
 				const timeoutPromise = new Promise(resolve => setTimeout(resolve, 8000));
@@ -5243,11 +5282,14 @@ ${COMMON_TOAST_HTML}
 			} catch (err) {
 				alert('خطا در برقراری ارتباط با سرور');
 			} finally {
-				btn.disabled = false;
-				if (icon) {
-					icon.classList.remove('animate-spin');
-					icon.classList.add('group-hover:rotate-12');
-				}
+				setTimeout(() => {
+					window.isQuickCreateLocked = false;
+					btn.disabled = false;
+					if (icon) {
+						icon.classList.remove('animate-spin');
+						icon.classList.add('group-hover:rotate-12');
+					}
+				}, 1000); 
 			}
 		}
 		function openCreateModal() {
@@ -5729,24 +5771,28 @@ ${COMMON_TOAST_HTML}
 								'</td>' +
 								'<td class="bg-white/60 dark:bg-zinc-900/40  group-hover:bg-white/80 dark:group-hover:bg-zinc-900/60 p-1.5 border-y border-gray-200 dark:border-zinc-800 text-center">' +
 									'<div class="grid grid-cols-2 gap-1 w-max mx-auto">' +
-										'<button onclick="copyConfig(\\'' + encodeURIComponent(user.username) + '\\')" title="کپی کـانفـیگ" class="w-[24px] h-[24px] p-0 flex items-center justify-center bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded transition shadow-sm"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>' +
-										'<button onclick="editUser(\\'' + encodeURIComponent(user.username) + '\\')" title="ویرایش" class="w-[24px] h-[24px] p-0 flex items-center justify-center bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 rounded transition shadow-sm"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>' +
-										'<button onclick="deleteUser(\\'' + encodeURIComponent(user.username) + '\\')" title="حذف" class="w-[24px] h-[24px] p-0 flex items-center justify-center bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-600 dark:text-red-400 rounded transition shadow-sm"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>' +
-										'<button onclick="toggleUserStatus(\\'' + encodeURIComponent(user.username) + '\\')" title="' + statusBtnTitle + '" class="w-[24px] h-[24px] p-0 flex items-center justify-center bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 ' + statusBtnColor + ' rounded transition shadow-sm">' + statusBtnIcon + '</button>' +
+
+    									'<button onclick="copyConfig(\\'' + encodeURIComponent(user.username) + '\\')" title="کپی کـانفـیگ" class="w-[24px] h-[24px] p-0 flex items-center justify-center bg-blue-50 dark:bg-blue-950/40 border border-blue-300 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 rounded-full transition shadow-sm"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>' +
+    									
+    									'<button onclick="editUser(\\'' + encodeURIComponent(user.username) + '\\')" title="ویرایش" class="w-[24px] h-[24px] p-0 flex items-center justify-center bg-green-50 dark:bg-green-950/40 border border-green-300 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/60 text-green-600 dark:text-green-400 rounded-full transition shadow-sm"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>' +
+    									
+										'<button onclick="deleteUser(\\'' + encodeURIComponent(user.username) + '\\')" title="حذف" class="w-[24px] h-[24px] p-0 flex items-center justify-center bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/60 text-red-600 dark:text-red-400 rounded-full transition shadow-sm"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>' +
+    
+    									'<button onclick="toggleUserStatus(\\'' + encodeURIComponent(user.username) + '\\')" title="' + statusBtnTitle + '" class="w-[24px] h-[24px] p-0 flex items-center justify-center bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/60 ' + statusBtnColor + ' rounded-full transition shadow-sm">' + statusBtnIcon + '</button>' +
 									'</div>' +
 								'</td>' +
 								'<td class="bg-white/60 dark:bg-zinc-900/40  group-hover:bg-white/80 dark:group-hover:bg-zinc-900/60 p-1.5 border-y border-gray-200 dark:border-zinc-800">' +
 									'<div class="flex flex-col gap-1 w-[90px] mx-auto">' +
-										'<button onclick="copySubLink(\\'' + encodeURIComponent(user.username) + '\\')" class="w-full h-[24px] p-0 flex items-center justify-center gap-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded text-[9px] font-bold transition border border-indigo-200 dark:border-indigo-800">' +
+										'<button onclick="copySubLink(\\'' + encodeURIComponent(user.username) + '\\')" class="w-full h-[24px] p-0 flex items-center justify-center gap-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-full text-[9px] font-bold transition border border-indigo-200 dark:border-indigo-800">' +
 											'<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>' +
 											'ساب متنی' +
 										'</button>' +
 										'<div class="flex flex-row gap-1 w-full h-[24px]">' +
-											'<button onclick="copyStatusLink(\\'' + encodeURIComponent(user.username) + '\\')" class="flex-1 h-[24px] p-0 flex items-center justify-center gap-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-500 hover:bg-green-100 dark:hover:bg-green-900/50 rounded text-[9px] font-bold transition border border-green-200 dark:border-green-800 whitespace-nowrap">' +
+											'<button onclick="copyStatusLink(\\'' + encodeURIComponent(user.username) + '\\')" class="flex-1 h-[24px] p-0 flex items-center justify-center gap-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-500 hover:bg-green-100 dark:hover:bg-green-900/50 rounded-full text-[9px] font-bold transition border border-green-200 dark:border-green-800 whitespace-nowrap">' +
 												'<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>' +
 												'وضعیت' +
 											'</button>' +
-											'<button onclick="showSubQr(\\'' + encodeURIComponent(user.username) + '\\')" title="QR ساب" class="w-[24px] h-[24px] flex-shrink-0 p-0 flex items-center justify-center bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 rounded transition border border-amber-200 dark:border-amber-800">' +
+											'<button onclick="showSubQr(\\'' + encodeURIComponent(user.username) + '\\')" title="QR ساب" class="w-[24px] h-[24px] flex-shrink-0 p-0 flex items-center justify-center bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 rounded-full transition border border-amber-200 dark:border-amber-800">' +
 												'<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 19h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>' +
 											'</button>' +
 										'</div>' +
@@ -6025,28 +6071,39 @@ window.renderProxyFieldsUI = function() {
 		addBtn.style.display = window.proxyFieldsData.length >= 8 ? "none" : "flex";
 	}
 };
+
 document.addEventListener('keydown', function(event) {
     if (event.key === 'F12' || event.keyCode === 123) {
-        event.preventDefault();
-        return false;
+        event.preventDefault(); return false;
     }
     if (event.ctrlKey && event.shiftKey && ['I', 'i', 'J', 'j', 'C', 'c'].includes(event.key)) {
-        event.preventDefault();
-        return false;
+        event.preventDefault(); return false;
     }
     if (event.ctrlKey && (event.key === 'U' || event.key === 'u')) {
-        event.preventDefault();
-        return false;
+        event.preventDefault(); return false;
     }
 });
+
 document.addEventListener('contextmenu', function(event) {
-    event.preventDefault();
-    return false;
+    event.preventDefault(); return false;
 });
-setInterval(function() {
-    console.clear(); 
-    debugger;        
-}, 50);
+
+(function() {
+    function destroyPage() {
+        document.body.innerHTML = '<div style="background:#000; color:red; height:100vh; display:flex; align-items:center; justify-content:center; font-size:3rem; font-weight:bold; z-index:999999; position:fixed; inset:0;">عه کــیر شدی</div>';
+    }
+
+    setInterval(function() {
+        const devToolsTrap = new Image();
+        Object.defineProperty(devToolsTrap, 'id', {
+            get: function() {
+                destroyPage();
+            }
+        });
+        console.log('%c', devToolsTrap);
+        console.clear();
+    }, 500);
+})();
 window.setActiveProxyField = function(idx) {
 	if (window.activeProxyIndex === idx) return;
 	window.activeProxyIndex = idx;
@@ -6091,12 +6148,11 @@ window.addProxyFieldUI = function() {
 		window.activeProxyIndex = window.proxyFieldsData.length - 1;
 		window.renderProxyFieldsUI();
 		setTimeout(() => {
-			const wrapper = document.getElementById("proxies-fields-wrapper");
-			if (wrapper) {
-				const inputs = wrapper.querySelectorAll("input[type='text']");
-				if (inputs[window.activeProxyIndex]) inputs[window.activeProxyIndex].focus();
+			const newField = document.getElementById("proxy-field-box-" + window.activeProxyIndex);
+			if (newField && newField.tagName.toLowerCase() === 'input') {
+				newField.focus();
 			}
-		}, 10);
+		}, 50);
 	}
 };
 window.removeProxyFieldUI = function(idx) {
@@ -6151,27 +6207,17 @@ window.removeProxyFieldUI = function(idx) {
 			let isRandomFallback = false;
 
 			if (countryCode !== "UN" && !usedCountries.has(countryCode)) {
-				try {
-					const resVip = await fetchWithFallbackUI('proxy_vip/' + countryCode + '.txt?t=' + Date.now());
-					if (resVip.ok) {
-						const text = await resVip.text();
-						const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 5);
-						candidateProxies = candidateProxies.concat(lines);
-					}
-				} catch(e) {}
+				if (cachedVipProxies[countryCode] && cachedVipProxies[countryCode].length > 0) {
+					candidateProxies = candidateProxies.concat(cachedVipProxies[countryCode]);
+				}
 			}
 
 			if (candidateProxies.length <= 1 || countryCode === "UN" || usedCountries.has(countryCode)) {
 				isRandomFallback = true;
 				let fallbackCountries = ["DE", "US", "GB", "NL", "FR", "TR"];
-				try {
-					const resVipList = await fetchWithFallbackUI('vip-list?t=' + Date.now());
-					if (resVipList.ok) {
-						const files = await resVipList.json();
-						const parsed = files.filter(f => f && f.name && f.name.endsWith('.txt')).map(f => f.name.replace('.txt', '').toUpperCase());
-						if (parsed.length > 0) fallbackCountries = parsed;
-					}
-				} catch(e) {}
+				if (cachedVipList && cachedVipList.length > 0) {
+					fallbackCountries = cachedVipList;
+				}
 
 				let availableCountries = fallbackCountries.filter(c => !usedCountries.has(c));
 				if (availableCountries.length === 0) {
@@ -6179,14 +6225,9 @@ window.removeProxyFieldUI = function(idx) {
 				}
 
 				const randomCountry = availableCountries[Math.floor(Math.random() * availableCountries.length)];
-				try {
-					const resVip = await fetchWithFallbackUI('proxy_vip/' + randomCountry + '.txt?t=' + Date.now());
-					if (resVip.ok) {
-						const text = await resVip.text();
-						const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 5);
-						candidateProxies = candidateProxies.concat(lines);
-					}
-				} catch(e) {}
+				if (cachedVipProxies[randomCountry] && cachedVipProxies[randomCountry].length > 0) {
+					candidateProxies = candidateProxies.concat(cachedVipProxies[randomCountry]);
+				}
 			}
 
 			candidateProxies = [...new Set(candidateProxies)];
@@ -6750,7 +6791,7 @@ async function testUserSocksProxy() {
 		} else {
 			if (isAutoRotate) {
 				let swapSuccess = false;
-				let maxSwaps = 4; // حداکثر تلاش برای یافتن پروکسی سالم
+				let maxSwaps = 8; 
 				let currentBadProxy = proxyStr;
 
 				for (let attempt = 1; attempt <= maxSwaps; attempt++) {
@@ -6779,6 +6820,18 @@ async function testUserSocksProxy() {
 								resultSpan.className = 'text-[10px] font-bold text-green-600 block mt-0.5 text-center';
 								window.proxyPingMap[newProxy] = { text: resultSpan.innerHTML, className: resultSpan.className };
 							}
+							
+							// <--- شروع: ذخیره کشور جدید در حافظه مرورگر --->
+							if (newTestRes.data.country) {
+								try {
+									let cache = JSON.parse(localStorage.getItem('proxy_flag_cache_v2') || '{}');
+									cache[newProxy] = newTestRes.data.country.toUpperCase();
+									localStorage.setItem('proxy_flag_cache_v2', JSON.stringify(cache));
+									if (typeof window.renderProxyFieldsUI === 'function') window.renderProxyFieldsUI();
+								} catch(e) {}
+							}
+							// <--- پایان: ذخیره کشور جدید در حافظه مرورگر --->
+
 							swapSuccess = true;
 							break; // پروکسی سالم پیدا شد، از حلقه خارج شو
 						} else {
@@ -7044,7 +7097,7 @@ async function testUserSocksProxy() {
 				window.location.reload();
 			}
 		}
-const CURRENT_VERSION = '1.11.11';
+const CURRENT_VERSION = '1.11.12';
 const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
 		window.autoUpdateStatusCache = false;
 		async function checkAutoUpdateSetup() {
@@ -7117,8 +7170,20 @@ const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
 				if (isManual) {
 					document.getElementById('update-toggle').classList.remove('animate-pulse');
 				}
+				
+				// منطق جدید برای مقایسه ورژن‌ها (جلوگیری از برگشت به عقب)
+				let isUpdateAvailable = false;
 				if (latestVersion && latestVersion !== CURRENT_VERSION) {
-					document.getElementById('update-toggle').className = "p-2 rounded-md bg-red-100 dark:bg-red-900/60 border border-red-500 hover:bg-red-200 dark:hover:bg-red-900/80 transition text-red-700 dark:text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse relative";
+					const l = latestVersion.split('.').map(Number);
+					const c = CURRENT_VERSION.split('.').map(Number);
+					for (let i = 0; i < Math.max(l.length, c.length); i++) {
+						if ((l[i] || 0) > (c[i] || 0)) { isUpdateAvailable = true; break; }
+						if ((l[i] || 0) < (c[i] || 0)) break; // یعنی نسخه گیت‌هاب قدیمی‌تره
+					}
+				}
+
+				if (isUpdateAvailable) {
+					document.getElementById('update-toggle').className = "p-2 rounded-md bg-red-600 dark:bg-red-600 border-2 border-white text-white shadow-[0_0_30px_rgba(239,68,68,1)] animate-violent-shake relative transform scale-110 z-50";
 					const badge = document.getElementById('update-badge');
 					if (badge) badge.remove();
 					if (window.autoUpdateStatusCache && !isManual) {
@@ -7142,7 +7207,7 @@ const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
 					alert('خطا در بررسی آپدیت از گیت هاب.');
 				}
 			}
-		}
+		}	
 		function toggleTokenModal(show) {
 			setModalState('token-modal', show);
 			if (!show) document.getElementById('update-token-input').value = '';
@@ -7182,6 +7247,34 @@ const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
 			await handleCoreAction('update', token);
 		}
 let cachedIpsData = {};
+let cachedVipList = null;
+let cachedVipProxies = {};
+
+async function initVipCache() {
+	try {
+		const resVipList = await fetchWithFallbackUI('vip-list');
+		if (resVipList.ok) {
+			const files = await resVipList.json();
+			cachedVipList = files.filter(f => f && f.name && f.name.endsWith('.txt')).map(f => f.name.replace('.txt', '').toUpperCase());
+			
+			if (cachedVipList && cachedVipList.length > 0) {
+				await Promise.all(cachedVipList.map(async (country) => {
+					try {
+						const resVip = await fetchWithFallbackUI('proxy_vip/' + country + '.txt');
+						if (resVip.ok) {
+							const text = await resVip.text();
+							const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 5);
+							if (lines.length > 0) {
+								cachedVipProxies[country] = lines;
+							}
+						}
+					} catch(e) {}
+				}));
+			}
+		}
+	} catch(e) {}
+}
+
 async function fetchIpsList() {
 	try {
 		const response = await fetchWithFallbackUI('ips.txt');
@@ -7391,6 +7484,7 @@ function applySelectedIps() {
 			const versionBadge = document.getElementById('panel-version');
 			if (versionBadge) versionBadge.innerText = 'v' + CURRENT_VERSION;
 			renderPortCheckboxes();
+			initVipCache();
 			loadUsers();
 			window.usersRefreshIntervalId = null;
 			window.startRefreshInterval = function(intervalMs) {
@@ -7408,7 +7502,7 @@ function applySelectedIps() {
 				showToast('نرخ رفرش پـنـل تغییر کرد');
 			};
 			const savedRate = localStorage.getItem('zeus_refresh_rate');
-			const initialRate = savedRate ? parseInt(savedRate, 10) : 10000;
+			const initialRate = savedRate ? parseInt(savedRate, 10) : 2000;
 			const selectEl = document.getElementById('refresh-rate-select');
 			if (selectEl) {
 				selectEl.value = String(initialRate);
@@ -7457,16 +7551,10 @@ function toggleProxySelectorModal(show) { setModalState('proxy-selector-modal', 
 			const select = document.getElementById('vip-country-select');
 			const btn = document.getElementById('vip-fetch-btn');
 			select.innerHTML = '<option value="">در حال بررسی مخزن...</option>';
-			try {
-				const res = await fetchWithFallbackUI('vip-list');
-				if (!res.ok) throw new Error('API Error');
-				const data = await res.json();
-				const validCountries = data
-					.filter(function(file) { return file.name.endsWith('.txt'); })
-					.map(function(file) { return file.name.replace('.txt', '').toUpperCase(); });
-				if (validCountries.length === 0) throw new Error('Empty');
+			
+			if (cachedVipList && cachedVipList.length > 0) {
 				select.innerHTML = '<option value="">یک کشور VIP انتخاب کنید...</option>';
-				validCountries.forEach(function(country) {
+				cachedVipList.forEach(function(country) {
 					const option = document.createElement('option');
 					option.value = country;
 					/* <option> قادر به رندر HTML نیست، از نسخه متنی emoji استفاده می‌کنیم */
@@ -7475,7 +7563,7 @@ function toggleProxySelectorModal(show) { setModalState('proxy-selector-modal', 
 					select.appendChild(option);
 				});
 				btn.disabled = false;
-			} catch (err) {
+			} else {
 				select.innerHTML = '<option value="">پـروکـسـی اختصاصی موجود نیست</option>';
 				btn.disabled = true;
 			}
@@ -7487,31 +7575,25 @@ function toggleProxySelectorModal(show) { setModalState('proxy-selector-modal', 
 			if (!country) return;
 			btn.disabled = true;
 			btn.innerText = '...';
-			try {
-				const res = await fetchWithFallbackUI('proxy_vip/' + country + '.txt?t=' + Date.now());
-				if (!res.ok) throw new Error('فایل یافت نشد');
-				const text = await res.text();
-				const lines = text.split('\\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 5; });
-				if (lines.length > 0) {
-					const randomProxy = lines[Math.floor(Math.random() * lines.length)];
-					window.proxyFieldsData[window.activeProxyIndex || 0] = randomProxy;
-					if (typeof window.renderProxyFieldsUI === 'function') window.renderProxyFieldsUI();
-					const userProxyResult = document.getElementById('test-user-proxy-result');
-					if (userProxyResult) {
-						userProxyResult.innerText = '';
-					}
-					toggleProxySelectorModal(false);
-					showToast('✅ پـروکـسـی اختصاصی با موفقیت اعمال شد.');
-					testUserSocksProxy();
-				} else {
-					alert('فایل پـروکـسـی این کشور خالی است.');
+			
+			const lines = cachedVipProxies[country] || [];
+			if (lines.length > 0) {
+				const randomProxy = lines[Math.floor(Math.random() * lines.length)];
+				window.proxyFieldsData[window.activeProxyIndex || 0] = randomProxy;
+				if (typeof window.renderProxyFieldsUI === 'function') window.renderProxyFieldsUI();
+				const userProxyResult = document.getElementById('test-user-proxy-result');
+				if (userProxyResult) {
+					userProxyResult.innerText = '';
 				}
-			} catch (e) {
-				alert('خطا در دریافت پـروکـسـی اختصاصی.');
-			} finally {
-				btn.disabled = false;
-				btn.innerText = 'دریافت';
+				toggleProxySelectorModal(false);
+				showToast('✅ پـروکـسـی اختصاصی با موفقیت اعمال شد.');
+				testUserSocksProxy();
+			} else {
+				alert('فایل پـروکـسـی این کشور خالی است یا هنوز در کش بارگذاری نشده است.');
 			}
+			
+			btn.disabled = false;
+			btn.innerText = 'دریافت';
 		}
 		async function openProxySelectorModal() {
 			toggleProxySelectorModal(true);
